@@ -1,0 +1,320 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------
+
+
+enum EnrollmentType {
+  IN_PERSON
+  INDEPENDENT_STUDY
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  DROPPED
+  COMPLETED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum SemesterStatus {
+  UPCOMING
+  ACTIVE
+  CLOSED
+}
+
+enum RsvpStatus {
+  GOING
+  MAYBE
+  NOT_GOING
+}
+
+enum ClassCategory {
+  SCRIPTURE_STUDY
+  MISSIONARY_PREP
+  INSTITUTE_FOUNDATIONS
+  OTHER
+}
+
+enum CreditType {
+  CORE
+  ELECTIVE
+}
+enum Role {
+  AREA_ADMIN
+  STAKE_ADMIN
+  COORDINATOR
+  TEACHER
+  STUDENT
+}
+
+// ------------------------------------------------------------
+// Core identity
+// ------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student Student?
+  teacher Teacher?
+
+  announcementsAuthored Announcement[] @relation("AnnouncementAuthor")
+  eventsCreated         Event[]        @relation("EventCreator")
+
+  @@index([role])
+}
+
+model Student {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id])
+
+  ward                   String?
+  stake                  String?
+  phone                  String?
+  membershipRecordNumber String?
+  occupation             String?
+  school                 String?
+
+  active                 Boolean  @default(true)
+
+  enrollments            Enrollment[]
+  attendanceRecords      Attendance[]
+  graduationProgress     GraduationProgress?
+  eventRsvps             EventRsvp[]
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model Teacher {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  phone     String?
+
+  classes   Class[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ------------------------------------------------------------
+// Semester
+// ------------------------------------------------------------
+
+model Semester {
+  id        String         @id @default(cuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  status    SemesterStatus @default(UPCOMING)
+
+  classes   Class[]
+  events    Event[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ------------------------------------------------------------
+// Classes & Enrollment
+// ------------------------------------------------------------
+
+model Class {
+  id         String        @id @default(cuid())
+  name       String
+  category   ClassCategory @default(SCRIPTURE_STUDY)
+  creditType CreditType    @default(CORE)
+
+  semesterId String
+  semester   Semester      @relation(fields: [semesterId], references: [id])
+
+  teacherId  String?
+  teacher    Teacher?      @relation(fields: [teacherId], references: [id])
+
+  dayOfWeek  Int?
+  startTime  String?
+  venue      String?
+  capacity   Int?
+  archived   Boolean       @default(false)
+
+  enrollments        Enrollment[]
+  attendance         Attendance[]
+  attendanceSessions AttendanceSession[]
+  announcements      Announcement[]
+  resources          Resource[]
+
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model Enrollment {
+  id         String           @id @default(cuid())
+
+  studentId  String
+  student    Student          @relation(fields: [studentId], references: [id])
+
+  classId    String
+  class      Class            @relation(fields: [classId], references: [id])
+
+  type       EnrollmentType   @default(IN_PERSON)
+  status     EnrollmentStatus @default(ACTIVE)
+
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([studentId, classId])
+}
+
+// ------------------------------------------------------------
+// Attendance + QR check-in sessions
+// ------------------------------------------------------------
+
+model AttendanceSession {
+  id        String   @id @default(cuid())
+
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id])
+
+  date      DateTime
+  token     String   @unique
+  expiresAt DateTime
+  latitude  Float?
+  longitude Float?
+
+  createdAt DateTime @default(now())
+}
+
+model Attendance {
+  id        String            @id @default(cuid())
+
+  studentId String
+  student   Student           @relation(fields: [studentId], references: [id])
+
+  classId   String
+  class     Class             @relation(fields: [classId], references: [id])
+
+  date      DateTime
+  status    AttendanceStatus
+
+  verifiedById String?
+
+  createdAt DateTime          @default(now())
+
+  @@unique([studentId, classId, date])
+  @@index([classId, date])
+}
+
+// ------------------------------------------------------------
+// Graduation tracking
+// ------------------------------------------------------------
+
+model GraduationProgress {
+  id                       String    @id @default(cuid())
+
+  studentId                String    @unique
+  student                  Student   @relation(fields: [studentId], references: [id])
+
+  coreCreditsCompleted     Int       @default(0)
+  coreCreditsRequired      Int       @default(2)
+  electiveCreditsCompleted Int       @default(0)
+  electiveCreditsRequired  Int       @default(2)
+
+  graduated                Boolean   @default(false)
+  graduationDate           DateTime?
+
+  updatedAt                DateTime  @updatedAt
+}
+
+// ------------------------------------------------------------
+// Announcements
+// ------------------------------------------------------------
+
+model Announcement {
+  id         String   @id @default(cuid())
+  title      String
+  body       String
+
+  authorId   String
+  author     User     @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+
+  classId    String?
+  class      Class?   @relation(fields: [classId], references: [id])
+
+  createdAt  DateTime @default(now())
+}
+
+// ------------------------------------------------------------
+// Events & RSVP
+// ------------------------------------------------------------
+
+model Event {
+  id         String      @id @default(cuid())
+  title      String
+  description String?
+  date       DateTime
+  venue      String?
+
+  semesterId String?
+  semester   Semester?   @relation(fields: [semesterId], references: [id])
+
+  createdById String
+  createdBy   User        @relation("EventCreator", fields: [createdById], references: [id])
+
+  rsvps      EventRsvp[]
+
+  createdAt  DateTime    @default(now())
+}
+
+model EventRsvp {
+  id        String     @id @default(cuid())
+
+  studentId String
+  student   Student    @relation(fields: [studentId], references: [id])
+
+  eventId   String
+  event     Event      @relation(fields: [eventId], references: [id])
+
+  status    RsvpStatus @default(GOING)
+
+  createdAt DateTime   @default(now())
+
+  @@unique([studentId, eventId])
+}
+
+// ------------------------------------------------------------
+// Resource Library
+// ------------------------------------------------------------
+
+model Resource {
+  id        String   @id @default(cuid())
+  title     String
+  fileUrl   String
+
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id])
+
+  uploadedById String
+
+  createdAt DateTime @default(now())
+}
