@@ -7,6 +7,7 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 
 type StudentData = {
   user: { name: string };
+  stake: string | null;
   graduationProgress: {
     coreCreditsCompleted: number; coreCreditsRequired: number;
     electiveCreditsCompleted: number; electiveCreditsRequired: number;
@@ -31,13 +32,15 @@ export default function MySchedulePage() {
       .then(setData);
   }, []);
 
-  useEffect(() => {
-    if (!data || data.enrollments.length === 0) return;
-    const classId = data.enrollments[0].class.id;
-    fetch(`/api/announcements?classId=${classId}`)
-      .then((res) => res.json())
-      .then(setAnnouncements);
-  }, [data]);
+ useEffect(() => {
+  if (!data || data.enrollments.length === 0) return;
+  const classId = data.enrollments[0].class.id;
+  const params = new URLSearchParams({ classId });
+  if (data.stake) params.set("stake", data.stake);
+  fetch(`/api/announcements?${params.toString()}`)
+    .then((res) => res.json())
+    .then(setAnnouncements);
+}, [data]);
 
   if (!data) {
     return <div className="min-h-screen bg-parchment p-8 text-navy/50">Loading...</div>;
