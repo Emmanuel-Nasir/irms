@@ -18,15 +18,26 @@ type StudentData = {
   attendanceRecords: { id: string; date: string; status: string; class: { name: string } }[];
 };
 
+type AnnouncementItem = { id: string; title: string; body: string; createdAt: string };
+
 export default function MySchedulePage() {
   const [data, setData] = useState<StudentData | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
 
   useEffect(() => {
     fetch("/api/students/me")
       .then((res) => res.json())
       .then(setData);
   }, []);
+
+  useEffect(() => {
+    if (!data || data.enrollments.length === 0) return;
+    const classId = data.enrollments[0].class.id;
+    fetch(`/api/announcements?classId=${classId}`)
+      .then((res) => res.json())
+      .then(setAnnouncements);
+  }, [data]);
 
   if (!data) {
     return <div className="min-h-screen bg-parchment p-8 text-navy/50">Loading...</div>;
@@ -43,7 +54,6 @@ export default function MySchedulePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
-          {/* Check-in */}
           <div className="rounded-lg border-t-4 border-gold bg-white p-6 shadow-sm">
             <h2 className="mb-3 font-display text-lg text-navy">Check In to Class</h2>
             {scanning ? (
@@ -59,7 +69,6 @@ export default function MySchedulePage() {
             <p className="mt-2 text-xs text-navy/40">Point your camera at the QR your teacher is displaying.</p>
           </div>
 
-          {/* Schedule */}
           <div className="rounded-lg border-t-4 border-gold bg-white p-6 shadow-sm">
             <h2 className="mb-3 font-display text-lg text-navy">My Schedule</h2>
             {data.enrollments.length === 0 ? (
@@ -80,10 +89,25 @@ export default function MySchedulePage() {
               </div>
             )}
           </div>
+
+          <div className="rounded-lg border-t-4 border-gold bg-white p-6 shadow-sm">
+            <h2 className="mb-3 font-display text-lg text-navy">Announcements</h2>
+            {announcements.length === 0 ? (
+              <p className="text-sm text-navy/40">No announcements yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {announcements.map((a) => (
+                  <div key={a.id} className="border-b border-navy/10 pb-3 last:border-0">
+                    <p className="font-medium text-navy">{a.title}</p>
+                    <p className="text-sm text-navy/60">{a.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-6">
-          {/* Progress */}
           <div className="rounded-lg border-t-4 border-gold bg-white p-6 shadow-sm">
             <h2 className="mb-4 font-display text-lg text-navy">Graduation Progress</h2>
 
@@ -100,7 +124,6 @@ export default function MySchedulePage() {
             <p className="text-xs text-navy/50">{gp?.electiveCreditsCompleted ?? 0} of {gp?.electiveCreditsRequired ?? 2}</p>
           </div>
 
-          {/* Recent attendance */}
           <div className="rounded-lg border-t-4 border-gold bg-white p-6 shadow-sm">
             <h2 className="mb-3 font-display text-lg text-navy">Recent Attendance</h2>
             {data.attendanceRecords.length === 0 ? (

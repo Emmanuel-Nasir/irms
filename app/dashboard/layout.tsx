@@ -20,7 +20,8 @@ const NAV: NavItem[] = [
   { href: "/dashboard/graduation", label: "Graduation", roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
   { href: "/dashboard/reports", label: "Reports", roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
   { href: "/dashboard/change-password", label: "Change Password", roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR", "TEACHER", "STUDENT"] },
-{ href: "/dashboard/export", label: "Export Data", roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
+  { href: "/dashboard/export", label: "Export Data", roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
+  { href: "/dashboard/announcements", label: "Announcements", roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
 ];
 
 type CurrentUser = { name: string; role: string } | null;
