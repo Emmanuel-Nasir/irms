@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "You must be logged in" }, { status: 401 });
   }
 
-  const { title, body, classId } = await req.json();
+  const { title, body, classId, targetStake } = await req.json();
   if (!title || !body) {
     return NextResponse.json({ error: "Title and body are required" }, { status: 400 });
   }
@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
       body,
       authorId: currentUser.userId,
       classId: classId || null,
+      targetStake: targetStake || null,
     },
     include: { author: true, class: true },
   });
@@ -28,9 +29,16 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const classId = req.nextUrl.searchParams.get("classId");
+  const stake = req.nextUrl.searchParams.get("stake");
+
+  const conditions: Record<string, unknown>[] = [
+    { AND: [{ classId: null }, { targetStake: null }] }, // true stake-wide, everyone
+  ];
+  if (classId) conditions.push({ classId });
+  if (stake) conditions.push({ targetStake: stake });
 
   const announcements = await prisma.announcement.findMany({
-    where: classId ? { OR: [{ classId }, { classId: null }] } : undefined,
+    where: { OR: conditions },
     include: { author: true, class: true },
     orderBy: { createdAt: "desc" },
   });

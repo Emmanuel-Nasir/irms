@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
 }
 datasource db {
   provider = "postgresql"
@@ -258,6 +259,8 @@ model Announcement {
 
   classId    String?
   class      Class?   @relation(fields: [classId], references: [id])
+
+  targetStake String?
 
   createdAt  DateTime @default(now())
 }

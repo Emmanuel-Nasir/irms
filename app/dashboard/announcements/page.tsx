@@ -13,14 +13,18 @@ export default function AnnouncementsPage() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [title, setTitle] = useState(""); const [body, setBody] = useState("");
   const [classId, setClassId] = useState("");
+  const [targetStake, setTargetStake] = useState("");
+  const [stakes, setStakes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   async function loadData() {
-    const [aRes, cRes] = await Promise.all([
-      fetch("/api/announcements"), fetch("/api/classes"),
+    const [aRes, cRes, sRes] = await Promise.all([
+      fetch("/api/announcements"), fetch("/api/classes"), fetch("/api/students"),
     ]);
     setAnnouncements(await aRes.json());
     setClasses(await cRes.json());
+    const students: { stake: string | null }[] = await sRes.json();
+    setStakes(Array.from(new Set(students.map((s) => s.stake).filter(Boolean))) as string[]);
   }
 
   useEffect(() => { loadData(); }, []);
@@ -31,9 +35,9 @@ export default function AnnouncementsPage() {
     await fetch("/api/announcements", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, body, classId }),
+      body: JSON.stringify({ title, body, classId, targetStake }),
     });
-    setTitle(""); setBody(""); setClassId("");
+    setTitle(""); setBody(""); setClassId(""); setTargetStake("");
     setLoading(false);
     loadData();
   }
@@ -47,11 +51,19 @@ export default function AnnouncementsPage() {
           className="mb-3 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" required />
         <textarea placeholder="Message" value={body} onChange={(e) => setBody(e.target.value)} rows={4}
           className="mb-3 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" required />
+
         <select value={classId} onChange={(e) => setClassId(e.target.value)}
-          className="mb-4 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold">
-          <option value="">Stake-wide (all students)</option>
+          className="mb-3 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold">
+          <option value="">Every class</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name} only</option>)}
         </select>
+
+        <select value={targetStake} onChange={(e) => setTargetStake(e.target.value)}
+          className="mb-4 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold">
+          <option value="">Every stake</option>
+          {stakes.map((s) => <option key={s} value={s}>{s} only</option>)}
+        </select>
+
         <button type="submit" disabled={loading}
           className="rounded bg-navy px-4 py-2 font-medium text-parchment transition-all hover:bg-gold hover:text-navy disabled:opacity-50">
           {loading ? "Posting..." : "Post Announcement"}
