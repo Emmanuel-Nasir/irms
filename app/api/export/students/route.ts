@@ -31,12 +31,11 @@ export async function GET(req: NextRequest) {
   for (const s of students) {
     let enrollments = s.enrollments;
     if (classFilter) {
-      enrollments = enrollments.filter((e) => e.classId === classFilter);
+enrollments = enrollments.filter((e: typeof enrollments[number]) => e.classId === classFilter);
       if (enrollments.length === 0) continue;
     }
 
-    const classNames = enrollments.map((e) => e.class.name).join("; ");
-    const core = s.graduationProgress
+const classNames = enrollments.map((e: typeof enrollments[number]) => e.class.name).join("; ");    const core = s.graduationProgress
       ? `${s.graduationProgress.coreCreditsCompleted}/${s.graduationProgress.coreCreditsRequired}`
       : "";
     const elective = s.graduationProgress
