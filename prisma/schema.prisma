@@ -53,6 +53,7 @@ enum CreditType {
   ELECTIVE
 }
 enum Role {
+  SUPER_ADMIN
   AREA_ADMIN
   STAKE_ADMIN
   COORDINATOR
