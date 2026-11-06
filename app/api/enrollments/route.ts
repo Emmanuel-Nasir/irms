@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       classId,
       type: type || "IN_PERSON",
     },
-    include: { student: { include: { user: true } }, class: true },
+    include: { student: { include: {    user: { select: { name: true, email: true } } } }, class: true },
   });
 
   return NextResponse.json(enrollment, { status: 201 });
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   const enrollments = await prisma.enrollment.findMany({
-    include: { student: { include: { user: true } }, class: true },
+    include: { student: { include: {    user: { select: { name: true, email: true } } } }, class: true },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(enrollments);

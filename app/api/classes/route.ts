@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   const classes = await prisma.class.findMany({
-    include: { semester: true, teacher: { include: { user: true } } },
+    include: { semester: true, teacher: { include: {    user: { select: { name: true, email: true } } } } },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(classes);

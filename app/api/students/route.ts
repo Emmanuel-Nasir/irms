@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
         create: { name, email, passwordHash, role: "STUDENT" },
       },
     },
-    include: { user: true },
+    include: {    user: { select: { name: true, email: true } } },
   });
 
   return NextResponse.json(student, { status: 201 });
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   const students = await prisma.student.findMany({
-    include: { user: true, graduationProgress: true },
+    include: {    user: { select: { name: true, email: true } }, graduationProgress: true },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(students);

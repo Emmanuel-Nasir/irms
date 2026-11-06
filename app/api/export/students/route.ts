@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const students = await prisma.student.findMany({
     where: stakeFilter ? { stake: stakeFilter } : undefined,
     include: {
-      user: true,
+         user: { select: { name: true, email: true } },
       enrollments: { include: { class: true } },
       graduationProgress: true,
     },
