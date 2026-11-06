@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireRole, STAFF } from "@/lib/permissions";   // ← added
 
 export async function POST(req: NextRequest) {
+  const auth = await requireRole(STAFF);                  // ← added
+  if (!auth.ok) return auth.response;                     // ← added
+
   const { name, startDate, endDate } = await req.json();
 
   if (!name || !startDate || !endDate) {
@@ -19,6 +23,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const auth = await requireRole(STAFF);                  // ← added
+  if (!auth.ok) return auth.response;                     // ← added
+
   const semesters = await prisma.semester.findMany({
     orderBy: { startDate: "desc" },
   });
