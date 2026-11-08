@@ -15,19 +15,31 @@ export default function CheckInPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(coords ?? {}),
-      })
-        .then(async (res) => {
-          const data = await res.json();
-          if (!res.ok) {
-            setStatus("error");
-            setMessage(data.error ?? "Check-in failed");
-            return;
-          }
-          setStatus("success");
-          setMessage("You're checked in!");
-        });
+      }).then(async (res) => {
+        if (res.status === 401) {
+          // Not signed in on this browser: sign in, then come straight back here
+          window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+          return;
+        }
+        const data = await res.json();
+        if (!res.ok) {
+          setStatus("error");
+          setMessage(
+            res.status === 400
+              ? `${data.error}. Turn on your phone's location, allow it for this browser, then scan again.`
+              : data.error ?? "Check-in failed"
+          );
+          return;
+        }
+        setStatus("success");
+        setMessage("You're checked in!");
+      });
     }
 
+    if (!navigator.geolocation) {
+      submit(null);
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => submit({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
       () => submit(null),

@@ -14,6 +14,17 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   const menuByRole: Record<string, { label: string; href: string }[]> = {
+    SUPER_ADMIN: [
+  { label: "All Users", href: "/dashboard/users" },
+  { label: "Stake Admins", href: "/dashboard/admins" },
+  { label: "Classes", href: "/dashboard/classes" },
+  { label: "Reports", href: "/dashboard/reports" },
+],
+AREA_ADMIN: [
+  { label: "Stake Admins", href: "/dashboard/admins" },
+  { label: "Classes", href: "/dashboard/classes" },
+  { label: "Reports", href: "/dashboard/reports" },
+],
     STAKE_ADMIN: [
       { label: "Manage Coordinators", href: "/dashboard/coordinators" },
       

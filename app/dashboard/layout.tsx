@@ -22,6 +22,7 @@ const NAV: NavItem[] = [
   { href: "/dashboard/change-password", label: "Change Password", roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR", "TEACHER", "STUDENT"] },
   { href: "/dashboard/export", label: "Export Data", roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
   { href: "/dashboard/announcements", label: "Announcements", roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
+  { href: "/dashboard/users", label: "All Users", roles: ["SUPER_ADMIN"] },
 ];
 
 type CurrentUser = { name: string; role: string } | null;
@@ -41,7 +42,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push("/login");
   }
 
-  const visibleNav = user ? NAV.filter((item) => item.roles.includes(user.role)) : [];
+const visibleNav = user
+  ? NAV.filter(
+      (item) =>
+        item.roles.includes(user.role) ||
+        (user.role === "SUPER_ADMIN" && item.roles.includes("AREA_ADMIN"))
+    )
+  : [];
 
   return (
     <div className="flex min-h-screen bg-parchment">
