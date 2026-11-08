@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const newClass = await prisma.class.create({
     data: {
       name,
-      category: category || "SCRIPTURE_STUDY",
+      category: category || "OTHER",
       semesterId,
       dayOfWeek: dayOfWeek !== undefined && dayOfWeek !== "" ? Number(dayOfWeek) : null,
       startTime: startTime || null,

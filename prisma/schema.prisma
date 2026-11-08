@@ -42,10 +42,13 @@ enum RsvpStatus {
 }
 
 enum ClassCategory {
+  CORNERSTONE
+  GOSPEL
+  SCRIPTURE
+  OTHER
   SCRIPTURE_STUDY
   MISSIONARY_PREP
   INSTITUTE_FOUNDATIONS
-  OTHER
 }
 
 enum CreditType {
