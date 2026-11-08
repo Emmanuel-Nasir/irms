@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireRole, STAFF } from "@/lib/permissions";
 
 export const runtime = "nodejs";
 
@@ -11,13 +12,16 @@ function escapeCsv(value: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const auth = await requireRole(STAFF);
+  if (!auth.ok) return auth.response;
+
   const stakeFilter = req.nextUrl.searchParams.get("stake");
   const classFilter = req.nextUrl.searchParams.get("classId");
 
   const students = await prisma.student.findMany({
     where: stakeFilter ? { stake: stakeFilter } : undefined,
     include: {
-         user: { select: { name: true, email: true } },
+      user: { select: { name: true, email: true } },
       enrollments: { include: { class: true } },
       graduationProgress: true,
     },
@@ -31,11 +35,12 @@ export async function GET(req: NextRequest) {
   for (const s of students) {
     let enrollments = s.enrollments;
     if (classFilter) {
-enrollments = enrollments.filter((e: typeof enrollments[number]) => e.classId === classFilter);
+      enrollments = enrollments.filter((e) => e.classId === classFilter);
       if (enrollments.length === 0) continue;
     }
 
-const classNames = enrollments.map((e: typeof enrollments[number]) => e.class.name).join("; ");    const core = s.graduationProgress
+    const classNames = enrollments.map((e) => e.class.name).join("; ");
+    const core = s.graduationProgress
       ? `${s.graduationProgress.coreCreditsCompleted}/${s.graduationProgress.coreCreditsRequired}`
       : "";
     const elective = s.graduationProgress

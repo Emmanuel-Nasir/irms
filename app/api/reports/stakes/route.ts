@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireRole, STAFF } from "@/lib/permissions";
 
 export async function GET() {
+  const auth = await requireRole(STAFF);
+  if (!auth.ok) return auth.response;
+
   const [students, teacherCount, classCount, activeSemester] = await Promise.all([
     prisma.student.findMany({ include: { enrollments: { include: { class: true } } } }),
     prisma.teacher.count(),

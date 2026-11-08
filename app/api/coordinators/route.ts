@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
+import { requireRole } from "@/lib/permissions";
 
 export async function POST(req: NextRequest) {
+  const auth = await requireRole(["AREA_ADMIN", "STAKE_ADMIN"]);
+  if (!auth.ok) return auth.response;
+
   const { name, email, password } = await req.json();
 
   if (!name || !email || !password) {
@@ -33,6 +37,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const auth = await requireRole(["AREA_ADMIN", "STAKE_ADMIN"]);
+  if (!auth.ok) return auth.response;
+
   const coordinators = await prisma.user.findMany({
     where: { role: "COORDINATOR" },
     select: { id: true, name: true, email: true, createdAt: true },

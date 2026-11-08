@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { requireRole } from "@/lib/permissions";
 
 export async function POST(req: NextRequest) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser || currentUser.role !== "AREA_ADMIN") {
-    return NextResponse.json({ error: "Only an Area Admin can create Stake Admin accounts" }, { status: 403 });
-  }
+  const auth = await requireRole(["AREA_ADMIN"]);
+  if (!auth.ok) return auth.response;
 
   const { name, email, password } = await req.json();
   if (!name || !email || !password) {
@@ -28,6 +26,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const auth = await requireRole(["AREA_ADMIN"]);
+  if (!auth.ok) return auth.response;
+
   const admins = await prisma.user.findMany({
     where: { role: "STAKE_ADMIN" },
     select: { id: true, name: true, email: true },

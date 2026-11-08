@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireRole, STAFF } from "@/lib/permissions";
 
 export async function POST(req: NextRequest) {
+  const auth = await requireRole(STAFF);
+  if (!auth.ok) return auth.response;
+
   const { name, category, semesterId, dayOfWeek, startTime, venue, capacity } = await req.json();
 
   if (!name || !semesterId) {
@@ -27,8 +31,14 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const auth = await requireRole(STAFF);
+  if (!auth.ok) return auth.response;
+
   const classes = await prisma.class.findMany({
-    include: { semester: true, teacher: { include: {    user: { select: { name: true, email: true } } } } },
+    include: {
+      semester: true,
+      teacher: { include: { user: { select: { name: true } } } },
+    },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(classes);

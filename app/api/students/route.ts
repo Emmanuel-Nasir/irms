@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
+import { requireRole, STAFF } from "@/lib/permissions";
 
 export async function POST(req: NextRequest) {
+  const auth = await requireRole(STAFF);
+  if (!auth.ok) return auth.response;
+
   const { name, email, password, ward, stake, phone } = await req.json();
 
   if (!name || !email || !password) {
@@ -31,15 +35,21 @@ export async function POST(req: NextRequest) {
         create: { name, email, passwordHash, role: "STUDENT" },
       },
     },
-    include: {    user: { select: { name: true, email: true } } },
+    include: { user: { select: { name: true, email: true } } },
   });
 
   return NextResponse.json(student, { status: 201 });
 }
 
 export async function GET() {
+  const auth = await requireRole(STAFF);
+  if (!auth.ok) return auth.response;
+
   const students = await prisma.student.findMany({
-    include: {    user: { select: { name: true, email: true } }, graduationProgress: true },
+    include: {
+      user: { select: { name: true, email: true } },
+      graduationProgress: true,
+    },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(students);

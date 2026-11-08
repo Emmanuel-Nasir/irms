@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireRole, STAFF } from "@/lib/permissions";
 
 export async function POST(req: NextRequest) {
+  const auth = await requireRole(STAFF);
+  if (!auth.ok) return auth.response;
+
   const { studentId, classId, type } = await req.json();
 
   if (!studentId || !classId) {
@@ -28,15 +32,24 @@ export async function POST(req: NextRequest) {
       classId,
       type: type || "IN_PERSON",
     },
-    include: { student: { include: {    user: { select: { name: true, email: true } } } }, class: true },
+    include: {
+      student: { include: { user: { select: { name: true, email: true } } } },
+      class: true,
+    },
   });
 
   return NextResponse.json(enrollment, { status: 201 });
 }
 
 export async function GET() {
+  const auth = await requireRole(STAFF);
+  if (!auth.ok) return auth.response;
+
   const enrollments = await prisma.enrollment.findMany({
-    include: { student: { include: {    user: { select: { name: true, email: true } } } }, class: true },
+    include: {
+      student: { include: { user: { select: { name: true, email: true } } } },
+      class: true,
+    },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(enrollments);
