@@ -7,7 +7,8 @@ import {
   BookOpen, Calendar, CalendarDays, ClipboardList, Download, FileText, GraduationCap,
   KeyRound, LayoutDashboard, Library, LogOut, Megaphone, Menu, School, Shield,
   ShieldCheck, UserCog, Users, X, type LucideIcon,
-} from "lucide-react";
+} from "lucide-react";import { IrmsMark, StakeLogo } from "@/app/components/Brand";
+
 
 type NavItem = { href: string; label: string; roles: string[]; icon: LucideIcon };
 
@@ -68,7 +69,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <button onClick={() => setOpen(true)} aria-label="Open menu" className="text-parchment">
           <Menu size={24} />
         </button>
-        <span className="font-display text-lg tracking-wide text-parchment">IRMS</span>
+        <span className="flex items-center gap-2">
+          <StakeLogo size={28} />
+          <span className="font-display text-lg tracking-wide text-parchment">IRMS</span>
+        </span>
         <span className="w-6" />
       </div>
 
@@ -80,8 +84,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="mb-6 flex items-center justify-between">
-          <p className="font-display text-xl tracking-wide text-parchment">IRMS</p>
+        <div className="mb-6 flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <StakeLogo size={44} />
+            <div className="leading-tight">
+              <div className="flex items-center gap-1.5">
+                <IrmsMark size={18} />
+                <p className="font-display text-lg tracking-wide text-parchment">IRMS</p>
+              </div>
+              <p className="text-[11px] text-parchment/60">Oke-Ata Stake</p>
+            </div>
+          </div>
           <button onClick={() => setOpen(false)} aria-label="Close menu" className="text-parchment lg:hidden">
             <X size={22} />
           </button>
