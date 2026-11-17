@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BookOpen, CalendarDays, Clock, MapPin, NotebookPen, Paperclip, QrCode } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, BookOpen, CalendarDays, Clock, FilePlus2, MapPin, NotebookPen, Paperclip, QrCode, Send, X } from "lucide-react";
 import { Reveal, Tilt } from "@/app/components/Alive";
 
 type ClassItem = {
@@ -15,6 +16,19 @@ type ClassItem = {
 };
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// Sidebar quick actions arrive as ?do=...: pick a class, then go straight to the task
+type Action = "attendance" | "plan" | "materials" | "announce";
+const ACTIONS: Record<Action, { ask: string; button: string; icon: typeof QrCode; target: (id: string) => string }> = {
+  attendance: { ask: "Which class are you taking attendance for?", button: "Take attendance", icon: QrCode, target: (id) => `/dashboard/attendance/${id}` },
+  plan: { ask: "Which class is this lesson for?", button: "Plan a lesson", icon: NotebookPen, target: (id) => `/dashboard/class/${id}?tab=lessons&new=1` },
+  materials: { ask: "Which class are these materials for?", button: "Share materials", icon: FilePlus2, target: (id) => `/dashboard/class/${id}?tab=materials` },
+  announce: { ask: "Which class are you posting to?", button: "Post here", icon: Send, target: (id) => `/dashboard/class/${id}?tab=announcements` },
+};
+function readAction(search: string): Action | null {
+  const d = new URLSearchParams(search).get("do");
+  return d && d in ACTIONS ? (d as Action) : null;
+}
 const GRADIENTS = [
   "from-navy via-navy-light to-navy",
   "from-[#2f5d4b] via-sage to-[#2f5d4b]",
@@ -24,6 +38,20 @@ const GRADIENTS = [
 
 export default function MyClassesPage() {
   const [classes, setClasses] = useState<ClassItem[] | null>(null);
+  const [action, setAction] = useState<Action | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    setAction(readAction(window.location.search));
+    const onQuick = (e: Event) => setAction(readAction((e as CustomEvent<string>).detail));
+    window.addEventListener("irms:quick", onQuick);
+    return () => window.removeEventListener("irms:quick", onQuick);
+  }, []);
+
+  // Only one class? No need to ask which.
+  useEffect(() => {
+    if (action && classes?.length === 1) router.replace(ACTIONS[action].target(classes[0].id));
+  }, [action, classes, router]);
 
   useEffect(() => {
     fetch("/api/classes/mine")
@@ -40,6 +68,21 @@ export default function MyClassesPage() {
           <BookOpen className="text-gold" /> My Classes
         </h1>
         <p className="mb-8 text-sm text-navy/60">Open a class to plan lessons, share materials, post announcements and take attendance.</p>
+
+        {action && (
+          <div className="irms-enter-down irms-glow mb-6 flex items-center justify-between gap-3 rounded-2xl border-2 border-gold bg-white px-5 py-4 shadow-sm">
+            <p className="flex items-center gap-2 font-medium text-navy">
+              {(() => {
+                const Icon = ACTIONS[action].icon;
+                return <Icon size={20} className="text-gold" />;
+              })()}
+              {ACTIONS[action].ask}
+            </p>
+            <button onClick={() => setAction(null)} className="text-navy/40 hover:text-navy" aria-label="Cancel">
+              <X size={18} />
+            </button>
+          </div>
+        )}
 
         {classes === null ? (
           <div className="flex justify-center py-16">
@@ -94,10 +137,13 @@ export default function MyClassesPage() {
                         </div>
                         <div className="mt-auto flex gap-2 pt-5">
                           <Link
-                            href={`/dashboard/class/${c.id}`}
-                            className="irms-shine group flex flex-1 items-center justify-center gap-2 rounded-xl bg-navy px-4 py-2.5 text-sm font-medium text-parchment hover:bg-gold hover:text-navy"
+                            href={action ? ACTIONS[action].target(c.id) : `/dashboard/class/${c.id}`}
+                            className={`irms-shine group flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium ${
+                              action ? "bg-gold text-navy hover:bg-navy hover:text-parchment" : "bg-navy text-parchment hover:bg-gold hover:text-navy"
+                            }`}
                           >
-                            Open class <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
+                            {action ? ACTIONS[action].button : "Open class"}{" "}
+                            <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
                           </Link>
                           <Link
                             href={`/dashboard/attendance/${c.id}`}

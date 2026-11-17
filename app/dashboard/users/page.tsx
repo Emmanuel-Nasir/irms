@@ -74,6 +74,12 @@ export default function UsersPage() {
 
   useEffect(() => {
     load();
+    if (new URLSearchParams(window.location.search).get("add") === "1") setShowAdd(true);
+    const onQuick = (e: Event) => {
+      if (new URLSearchParams((e as CustomEvent<string>).detail).get("add") === "1") setShowAdd(true);
+    };
+    window.addEventListener("irms:quick", onQuick);
+    return () => window.removeEventListener("irms:quick", onQuick);
   }, []);
 
   function flash(text: string) {

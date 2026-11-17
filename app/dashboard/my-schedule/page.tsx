@@ -31,6 +31,12 @@ export default function MySchedulePage() {
     fetch("/api/students/me")
       .then((res) => res.json())
       .then(setData);
+    if (new URLSearchParams(window.location.search).get("scan") === "1") setScanning(true);
+    const onQuick = (e: Event) => {
+      if (new URLSearchParams((e as CustomEvent<string>).detail).get("scan") === "1") setScanning(true);
+    };
+    window.addEventListener("irms:quick", onQuick);
+    return () => window.removeEventListener("irms:quick", onQuick);
   }, []);
 
  useEffect(() => {

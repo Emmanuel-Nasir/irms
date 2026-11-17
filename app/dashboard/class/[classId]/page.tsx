@@ -142,6 +142,14 @@ export default function ClassHubPage() {
     loadPosts();
   }, [loadHub, loadPlans, loadMaterials, loadPosts]);
 
+  // Opened from a sidebar quick action: go straight to the right tab (and form)
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const t = p.get("tab");
+    if (t === "lessons" || t === "materials" || t === "announcements" || t === "students") setTab(t);
+    if (t === "lessons" && p.get("new") === "1") setShowPlanForm(true);
+  }, []);
+
   async function send(url: string, method: string, body?: unknown) {
     setError("");
     setBusy(true);

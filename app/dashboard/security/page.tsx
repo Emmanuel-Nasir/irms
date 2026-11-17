@@ -50,6 +50,22 @@ export default function SecurityPage() {
     load();
   }, []);
 
+  // Opened from the "Download backup" quick action: bring the backup card into view
+  useEffect(() => {
+    function show() {
+      const el = document.getElementById("backup");
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.classList.add("irms-glow");
+      setTimeout(() => el?.classList.remove("irms-glow"), 4000);
+    }
+    if (data && new URLSearchParams(window.location.search).get("backup") === "1") show();
+    const onQuick = (e: Event) => {
+      if (new URLSearchParams((e as CustomEvent<string>).detail).get("backup") === "1") show();
+    };
+    window.addEventListener("irms:quick", onQuick);
+    return () => window.removeEventListener("irms:quick", onQuick);
+  }, [data]);
+
   function flash(text: string) {
     setNotice(text);
     setTimeout(() => setNotice(""), 3500);
@@ -310,7 +326,7 @@ export default function SecurityPage() {
                 )}
               </section>
 
-              <section className={card}>
+              <section id="backup" className={`${card} scroll-mt-6`}>
                 <h2 className="mb-2 flex items-center gap-2 font-display text-lg text-navy">
                   <DatabaseBackup size={20} className="text-gold" /> Backup
                 </h2>

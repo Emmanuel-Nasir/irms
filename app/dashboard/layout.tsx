@@ -4,14 +4,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, BookOpen, Calendar, CalendarDays, ChevronsLeft, ChevronsRight, ClipboardList, Download, FileText,
-  GraduationCap, KeyRound, LayoutDashboard, Library, LockKeyhole, LogOut, Megaphone, Menu, School, Search,
-  Shield, ShieldCheck, Timer, UserCog, Users, X, type LucideIcon,
+  Activity, BookOpen, BookPlus, Calendar, CalendarDays, ChevronsLeft, ChevronsRight, ClipboardList, DatabaseBackup,
+  Download, FilePlus2, FileText, GraduationCap, KeyRound, LayoutDashboard, Library, LockKeyhole, LogOut, Megaphone,
+  Menu, NotebookPen, QrCode, School, Search, Send, Shield, ShieldCheck, Timer, UserCog, UserPlus, Users, X,
+  type LucideIcon,
 } from "lucide-react";
 import { IrmsMark, StakeLogo } from "@/app/components/Brand";
 import { AnimatedBackground } from "@/app/components/Motion";
 
-type NavItem = { href: string; label: string; roles: string[]; icon: LucideIcon; keywords?: string };
+// quick: an action shortcut (never shown as the "current page", since it opens a task on another page)
+type NavItem = { href: string; label: string; roles: string[]; icon: LucideIcon; keywords?: string; quick?: boolean };
 type NavGroup = { title: string; items: NavItem[] };
 
 const LEADERS = ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"];
@@ -22,6 +24,26 @@ const GROUPS: NavGroup[] = [
   {
     title: "Home",
     items: [{ href: "/dashboard", label: "Overview", icon: LayoutDashboard, roles: EVERYONE, keywords: "home dashboard" }],
+  },
+  {
+    title: "Quick actions",
+    items: [
+      // Teachers
+      { href: "/dashboard/my-classes?do=attendance", label: "Take attendance", icon: QrCode, roles: ["TEACHER"], keywords: "qr scan register", quick: true },
+      { href: "/dashboard/my-classes?do=plan", label: "Plan a lesson", icon: NotebookPen, roles: ["TEACHER"], keywords: "lesson plan scriptures", quick: true },
+      { href: "/dashboard/my-classes?do=materials", label: "Share materials", icon: FilePlus2, roles: ["TEACHER"], keywords: "upload file handout link", quick: true },
+      { href: "/dashboard/my-classes?do=announce", label: "Post to my class", icon: Send, roles: ["TEACHER"], keywords: "announcement message", quick: true },
+      // Students
+      { href: "/dashboard/my-schedule?scan=1", label: "Scan to check in", icon: QrCode, roles: ["STUDENT"], keywords: "qr attendance", quick: true },
+      // Leaders
+      { href: "/dashboard/students?add=1", label: "Register a student", icon: UserPlus, roles: LEADERS, keywords: "new student add", quick: true },
+      { href: "/dashboard/classes?add=1", label: "Create a class", icon: BookPlus, roles: LEADERS, keywords: "new class course", quick: true },
+      { href: "/dashboard/enrollments?add=1", label: "Enroll a student", icon: ClipboardList, roles: LEADERS, keywords: "enrol add to class", quick: true },
+      { href: "/dashboard/announcements?add=1", label: "Post an announcement", icon: Send, roles: LEADERS, keywords: "message news", quick: true },
+      // Super admin
+      { href: "/dashboard/users?add=1", label: "Add a user", icon: UserPlus, roles: ["SUPER_ADMIN"], keywords: "new account", quick: true },
+      { href: "/dashboard/security?backup=1", label: "Download backup", icon: DatabaseBackup, roles: ["SUPER_ADMIN"], keywords: "export everything", quick: true },
+    ],
   },
   {
     title: "My work",
@@ -191,6 +213,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, [user, pathname, logout]);
 
+  // Quick actions that add something (?add=1): bring the page's form into view and focus it
+  const focusForm = useCallback(() => {
+    const form = document.querySelector<HTMLFormElement>(".irms-page form");
+    if (!form) return;
+    form.scrollIntoView({ behavior: "smooth", block: "center" });
+    form.classList.add("irms-glow");
+    form.querySelector<HTMLElement>("input:not([type=hidden]):not([type=checkbox]), select, textarea")?.focus({ preventScroll: true });
+    setTimeout(() => form.classList.remove("irms-glow"), 3500);
+  }, []);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("add") !== "1") return;
+    const t = setTimeout(focusForm, 700);
+    return () => clearTimeout(t);
+  }, [pathname, focusForm]);
+
+  // A quick action clicked while already on its page: tell the page (it won't reload)
+  function runQuick(href: string) {
+    const [path, search = ""] = href.split("?");
+    if (path !== pathname) return;
+    window.dispatchEvent(new CustomEvent("irms:quick", { detail: search }));
+    if (new URLSearchParams(search).get("add") === "1") setTimeout(focusForm, 300);
+  }
+
   // Ctrl+K (or ⌘K) jumps to the menu search
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -327,16 +372,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
               <div className="space-y-0.5">
                 {g.items.map((item) => {
-                  const active = isActive(item.href);
+                  const active = !item.quick && isActive(item.href);
                   const badge = badges[item.href];
                   delay += 0.03;
                   return (
                     <Link
-                      key={item.href}
+                      key={item.href + item.label}
                       href={item.href}
                       onClick={() => {
                         setOpen(false);
                         setQuery("");
+                        if (item.quick) runQuick(item.href);
                       }}
                       title={slim ? `${item.label}${badge ? ` (${badge.count} ${badge.hint.toLowerCase()})` : ""}` : undefined}
                       style={{ animationDelay: `${delay}s` }}
