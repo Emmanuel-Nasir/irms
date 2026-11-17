@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole, STAFF } from "@/lib/permissions";
+import { requireRole, STAFF, studentScope } from "@/lib/permissions";
 
 export async function GET() {
   const auth = await requireRole(STAFF);
   if (!auth.ok) return auth.response;
 
   const [students, teacherCount, classCount, activeSemester] = await Promise.all([
-    prisma.student.findMany({ include: { enrollments: { include: { class: true } } } }),
+    prisma.student.findMany({ where: studentScope(auth.user), include: { enrollments: { include: { class: true } } } }),
     prisma.teacher.count(),
     prisma.class.count(),
     prisma.semester.findFirst({ where: { status: "ACTIVE" } }),

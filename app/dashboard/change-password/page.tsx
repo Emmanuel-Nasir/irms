@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import TwoFactorCard from "@/app/components/TwoFactorCard";
 
 type Me = { name: string; email: string; role: string } | null;
 type Result = { ok: boolean; text: string } | null;
@@ -20,6 +21,7 @@ function Message({ result }: { result: Result }) {
 
 export default function MyAccountPage() {
   const [me, setMe] = useState<Me>(null);
+  const [mustChange, setMustChange] = useState(false);
 
   const [newEmail, setNewEmail] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
@@ -33,7 +35,13 @@ export default function MyAccountPage() {
   const [pwBusy, setPwBusy] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/me").then((r) => r.json()).then(setMe).catch(() => {});
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        setMe(data);
+        setMustChange(!!data?.mustChangePassword || new URLSearchParams(window.location.search).get("first") === "1");
+      })
+      .catch(() => {});
   }, []);
 
   async function changeEmail(e: React.FormEvent) {
@@ -63,8 +71,8 @@ export default function MyAccountPage() {
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
     setPwResult(null);
-    if (newPassword.length < 8) {
-      setPwResult({ ok: false, text: "Use at least 8 characters." });
+    if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setPwResult({ ok: false, text: "Use at least 8 characters, with at least one letter and one number." });
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -83,7 +91,12 @@ export default function MyAccountPage() {
       setPwResult({ ok: false, text: data.error ?? "Something went wrong" });
       return;
     }
-    setPwResult({ ok: true, text: "Password changed. Use the new one next time you sign in." });
+    setPwResult({ ok: true, text: "Password changed. Any other device signed in to your account has been signed out." });
+    if (mustChange) {
+      setMustChange(false);
+      // Their account is now fully open: reload so the menu and pages pick that up
+      setTimeout(() => (window.location.href = "/dashboard"), 1200);
+    }
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
@@ -107,6 +120,16 @@ export default function MyAccountPage() {
           " "
         )}
       </p>
+
+      {mustChange && (
+        <div className="irms-glow mb-6 max-w-4xl rounded-2xl border-2 border-gold bg-white p-5 shadow-sm">
+          <p className="font-display text-lg text-navy">Welcome! Choose your own password</p>
+          <p className="mt-1 text-sm text-navy/70">
+            Your account was set up with a temporary password. Choose a new one below to start using IRMS. Use at least 8
+            characters with a letter and a number, and avoid your name or anything easy to guess.
+          </p>
+        </div>
+      )}
 
       <div className="grid max-w-4xl gap-6 md:grid-cols-2">
         <form onSubmit={changeEmail} className={card}>
@@ -148,7 +171,7 @@ export default function MyAccountPage() {
             className={input}
             required
           />
-          <label className={label}>New password (at least 8 characters)</label>
+          <label className={label}>New password (8+ characters, a letter and a number)</label>
           <input
             type="password"
             autoComplete="new-password"
@@ -171,6 +194,8 @@ export default function MyAccountPage() {
           </button>
         </form>
       </div>
+
+      <TwoFactorCard />
     </div>
   );
 }

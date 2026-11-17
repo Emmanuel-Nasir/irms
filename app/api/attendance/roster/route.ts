@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, canManageClass, CLASS_MANAGERS } from "@/lib/permissions";
 import { startOfToday, todayKey, dayRange } from "@/lib/dates";
+import { audit } from "@/lib/audit";
 
 const MARKS = ["PRESENT", "LATE", "EXCUSED", "ABSENT"] as const;
 type Mark = (typeof MARKS)[number];
@@ -96,6 +97,17 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.attendance.findFirst({
     where: { studentId, classId: g.classId, date: dayRange(todayKey()) },
   });
+
+  const [student, cls] = await Promise.all([
+    prisma.student.findUnique({ where: { id: studentId }, include: { user: { select: { name: true } } } }),
+    prisma.class.findUnique({ where: { id: g.classId }, select: { name: true } }),
+  ]);
+  await audit(
+    g.user,
+    "ATTENDANCE_MARKED",
+    `${g.user.name} marked ${student?.user.name ?? "a student"} ${status.toLowerCase()} in ${cls?.name ?? "a class"}`,
+    studentId
+  );
 
   if (status === "ABSENT") {
     if (existing) await prisma.attendance.delete({ where: { id: existing.id } });

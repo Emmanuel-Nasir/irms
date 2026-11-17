@@ -17,3 +17,292 @@ body {
   color: var(--color-navy);
   font-family: var(--font-body);
 }
+
+/* ------------------------------------------------------------
+   Sign-in page motion
+   ------------------------------------------------------------ */
+
+@keyframes irms-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(12vw, 8vh) scale(1.15); }
+  66% { transform: translate(-6vw, 14vh) scale(0.9); }
+}
+@keyframes irms-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-14vw, -10vh) scale(1.2); }
+}
+@keyframes irms-drift-c {
+  0%, 100% { transform: translate(0, 0) scale(1.1); }
+  50% { transform: translate(10vw, -12vh) scale(0.85); }
+}
+@keyframes irms-rise {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: var(--irms-o, 0.5); }
+  90% { opacity: var(--irms-o, 0.5); }
+  100% { transform: translateY(-115vh) rotate(var(--irms-spin, 180deg)); opacity: 0; }
+}
+@keyframes irms-spin { to { transform: rotate(360deg); } }
+@keyframes irms-pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.7; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+@keyframes irms-slide-up {
+  from { transform: translateY(28px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes irms-slide-down {
+  from { transform: translateY(-24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes irms-slide-in-left {
+  from { transform: translateX(-18px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes irms-ticker-in {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes irms-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+@keyframes irms-shine {
+  from { transform: translateX(-120%) skewX(-20deg); }
+  to { transform: translateX(220%) skewX(-20deg); }
+}
+@keyframes irms-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+@keyframes irms-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes irms-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  70% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes irms-draw { to { stroke-dashoffset: 0; } }
+
+.irms-orb { position: absolute; border-radius: 9999px; filter: blur(70px); will-change: transform; }
+.irms-orb-a { animation: irms-drift-a 22s ease-in-out infinite; }
+.irms-orb-b { animation: irms-drift-b 26s ease-in-out infinite; }
+.irms-orb-c { animation: irms-drift-c 30s ease-in-out infinite; }
+.irms-particle { position: absolute; bottom: -40px; animation: irms-rise linear infinite; will-change: transform; }
+.irms-spin-slow { animation: irms-spin 24s linear infinite; }
+.irms-pulse-ring { animation: irms-pulse-ring 2.6s ease-out infinite; }
+.irms-float { animation: irms-float 6s ease-in-out infinite; }
+.irms-enter-up { animation: irms-slide-up 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-enter-down { animation: irms-slide-down 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-enter-left { animation: irms-slide-in-left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-ticker { animation: irms-ticker-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-shake { animation: irms-shake 0.45s ease-in-out; }
+.irms-pop { animation: irms-pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-draw { stroke-dasharray: 40; stroke-dashoffset: 40; animation: irms-draw 0.5s 0.25s ease-out forwards; }
+.irms-shimmer-bar {
+  background: linear-gradient(90deg, #c9a227, #f3dc8a, #5b8266, #c9a227, #f3dc8a);
+  background-size: 200% 100%;
+  animation: irms-shimmer 4s linear infinite;
+}
+.irms-shine { position: relative; overflow: hidden; }
+.irms-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: translateX(-120%) skewX(-20deg);
+}
+.irms-shine:hover::after { animation: irms-shine 0.9s ease; }
+
+/* ------------------------------------------------------------
+   Dashboard motion (every page inside the dashboard)
+   ------------------------------------------------------------ */
+
+@keyframes irms-page-in {
+  from { transform: translateY(18px); opacity: 0; filter: blur(4px); }
+  to { transform: translateY(0); opacity: 1; filter: blur(0); }
+}
+@keyframes irms-rise-in {
+  from { transform: translateY(22px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes irms-row-in {
+  from { transform: translateX(-14px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes irms-grow-up { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes irms-grow-right { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes irms-ring-fill { from { stroke-dashoffset: var(--irms-ring-full); } }
+@keyframes irms-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 162, 39, 0); }
+  50% { box-shadow: 0 0 18px 2px rgba(201, 162, 39, 0.45); }
+}
+@keyframes irms-toast-in {
+  from { transform: translateY(-16px) scale(0.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes irms-wiggle {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-12deg); }
+  75% { transform: rotate(12deg); }
+}
+@keyframes irms-gradient-pan {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* "backwards": the start state applies during any delay, and nothing is left behind afterwards,
+   so hover effects and pop-up windows inside pages keep working normally */
+.irms-page-enter { animation: irms-page-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+
+/* Cards, forms and tables on every dashboard page rise in one after another */
+.irms-page :where(.shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
+  animation: irms-rise-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.irms-page :where(.space-y-2, .space-y-3, .grid) > :nth-child(1) { animation-delay: 0.05s; }
+.irms-page :where(.space-y-2, .space-y-3, .grid) > :nth-child(2) { animation-delay: 0.1s; }
+.irms-page :where(.space-y-2, .space-y-3, .grid) > :nth-child(3) { animation-delay: 0.15s; }
+.irms-page :where(.space-y-2, .space-y-3, .grid) > :nth-child(4) { animation-delay: 0.2s; }
+.irms-page :where(.space-y-2, .space-y-3, .grid) > :nth-child(5) { animation-delay: 0.25s; }
+.irms-page :where(.space-y-2, .space-y-3, .grid) > :nth-child(6) { animation-delay: 0.3s; }
+.irms-page :where(.space-y-2, .space-y-3, .grid) > :nth-child(7) { animation-delay: 0.35s; }
+.irms-page :where(.space-y-2, .space-y-3, .grid) > :nth-child(n + 8) { animation-delay: 0.4s; }
+
+/* Table rows slide in */
+.irms-page tbody tr { animation: irms-row-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.irms-page tbody tr:nth-child(2) { animation-delay: 0.04s; }
+.irms-page tbody tr:nth-child(3) { animation-delay: 0.08s; }
+.irms-page tbody tr:nth-child(4) { animation-delay: 0.12s; }
+.irms-page tbody tr:nth-child(5) { animation-delay: 0.16s; }
+.irms-page tbody tr:nth-child(n + 6) { animation-delay: 0.2s; }
+
+/* Pages keep their own cream colour off, so the moving background shows through */
+.irms-page :where(.min-h-screen.bg-parchment) { background-color: transparent; }
+
+/* Navy page headers: slowly moving gradient, sliding title, shimmering gold line */
+.irms-page header.bg-navy {
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(110deg, #003057, #0a4a7a, #003057, #0d3d63);
+  background-size: 250% 250%;
+  animation: irms-gradient-pan 14s ease infinite;
+}
+.irms-page header.bg-navy h1 { animation: irms-slide-in-left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-page header.bg-navy::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, #c9a227, #f3dc8a, #5b8266, #c9a227, #f3dc8a);
+  background-size: 200% 100%;
+  animation: irms-shimmer 4s linear infinite;
+}
+
+/* Cards lift and glow a little when hovered */
+.irms-page :where(.shadow-sm) { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.irms-page :where(a.shadow-sm, div.shadow-sm):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px -12px rgba(0, 48, 87, 0.35);
+}
+
+/* Buttons press in, inputs glow gold when focused */
+.irms-page button:not(:disabled):active { transform: scale(0.97); }
+.irms-page :where(input, select, textarea):focus { box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.18); }
+.irms-page :where(input, select, textarea, button) { transition: all 0.2s ease; }
+
+.irms-bar { transform-origin: bottom; animation: irms-grow-up 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-meter { transform-origin: left; animation: irms-grow-right 1s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-ring { animation: irms-ring-fill 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-glow { animation: irms-glow 2.8s ease-in-out infinite; }
+.irms-toast { animation: irms-toast-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.irms-wiggle:hover { animation: irms-wiggle 0.4s ease-in-out; }
+.irms-gradient-pan {
+  background-size: 200% 200%;
+  animation: irms-gradient-pan 12s ease infinite;
+}
+
+/* ------------------------------------------------------------
+   Extra life: ticker, glowing borders, waves, scroll reveals, 3D tilt
+   ------------------------------------------------------------ */
+
+@keyframes irms-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes irms-border-spin { to { --irms-angle: 360deg; } }
+@keyframes irms-wave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes irms-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-14px) rotate(3deg); } }
+@keyframes irms-blink { 50% { opacity: 0; } }
+@keyframes irms-ping { 75%, 100% { transform: scale(2.2); opacity: 0; } }
+@keyframes irms-bounce-in {
+  0% { transform: scale(0.6) translateY(20px); opacity: 0; }
+  60% { transform: scale(1.05) translateY(-4px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); }
+}
+
+@property --irms-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.irms-marquee { display: flex; width: max-content; animation: irms-marquee 40s linear infinite; }
+.irms-marquee:hover { animation-play-state: paused; }
+
+/* A gold/green glowing border that runs around a card */
+.irms-glow-border { position: relative; isolation: isolate; }
+.irms-glow-border::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border-radius: inherit;
+  background: conic-gradient(from var(--irms-angle), #c9a227, #5b8266, #0a4a7a, #f3dc8a, #c9a227);
+  animation: irms-border-spin 6s linear infinite;
+  opacity: 0.75;
+}
+
+.irms-wave { animation: irms-wave 14s linear infinite; }
+.irms-wave-slow { animation: irms-wave 22s linear infinite reverse; }
+.irms-bob { animation: irms-bob 7s ease-in-out infinite; }
+.irms-caret { animation: irms-blink 1s step-end infinite; }
+.irms-ping { animation: irms-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite; }
+.irms-bounce-in { animation: irms-bounce-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+
+/* Sections slide in as they scroll into view (see <Reveal>) */
+.irms-reveal { opacity: 0; transform: translateY(40px) scale(0.98); transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.irms-reveal.irms-from-left { transform: translateX(-50px); }
+.irms-reveal.irms-from-right { transform: translateX(50px); }
+.irms-reveal.irms-shown { opacity: 1; transform: none; }
+
+/* 3D tilt (see <Tilt>) */
+.irms-tilt { transform-style: preserve-3d; transition: transform 0.2s ease-out, box-shadow 0.3s ease; will-change: transform; }
+.irms-tilt:hover { box-shadow: 0 25px 45px -18px rgba(0, 48, 87, 0.45); }
+
+/* Light pages: stronger moving colours */
+.irms-page-bg-strong .irms-orb { opacity: 1.6; }
+
+/* Sidebar menu: slim scrollbar, soft fade at the top and bottom edges */
+.irms-nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(250, 249, 246, 0.2) transparent;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 16px), transparent 100%);
+}
+.irms-nav-scroll::-webkit-scrollbar { width: 6px; }
+.irms-nav-scroll::-webkit-scrollbar-thumb { background: rgba(250, 249, 246, 0.2); border-radius: 9999px; }
+
+/* Respect phones and computers set to "reduce motion" */
+@media (prefers-reduced-motion: reduce) {
+  .irms-orb, .irms-particle, .irms-spin-slow, .irms-pulse-ring, .irms-float, .irms-enter-up,
+  .irms-enter-down, .irms-enter-left, .irms-ticker, .irms-shake, .irms-pop, .irms-shimmer-bar,
+  .irms-shine::after, .irms-page-enter, .irms-page *, .irms-bar, .irms-meter, .irms-ring, .irms-glow,
+  .irms-toast, .irms-gradient-pan, .irms-marquee, .irms-glow-border::before, .irms-wave, .irms-wave-slow,
+  .irms-bob, .irms-caret, .irms-ping, .irms-bounce-in {
+    animation: none !important;
+  }
+  .irms-particle { display: none; }
+  .irms-draw { stroke-dashoffset: 0; }
+  .irms-reveal { opacity: 1; transform: none; transition: none; }
+  .irms-tilt { transform: none !important; }
+}

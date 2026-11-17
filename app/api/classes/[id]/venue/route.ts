@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, canManageClass, CLASS_MANAGERS } from "@/lib/permissions";
 import { MAX_VENUE_ACCURACY_METERS } from "@/lib/geo";
+import { audit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -17,11 +18,11 @@ const SELECT = {
 
 async function guard(id: string) {
   const auth = await requireRole(CLASS_MANAGERS);
-  if (!auth.ok) return { response: auth.response };
+  if (!auth.ok) return { response: auth.response, user: null };
   if (!(await canManageClass(auth.user, id))) {
-    return { response: NextResponse.json({ error: "This isn't your class" }, { status: 403 }) };
+    return { response: NextResponse.json({ error: "This isn't your class" }, { status: 403 }), user: null };
   }
-  return { response: null };
+  return { response: null, user: auth.user };
 }
 
 // The class's name and its saved classroom location (if any)
@@ -39,7 +40,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 // student's check-in will be measured against it.
 export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
-  const { response } = await guard(id);
+  const { response, user } = await guard(id);
   if (response) return response;
 
   const body = await req.json().catch(() => ({}));
@@ -65,13 +66,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
     data: { venueLatitude: latitude, venueLongitude: longitude, venueAccuracy: accuracy, venueSavedAt: new Date() },
     select: SELECT,
   });
+  await audit(user, "CLASSROOM_LOCATION", `${user?.name} saved the classroom location for ${cls.name} (to about ${Math.round(accuracy)} m)`, id);
   return NextResponse.json(cls);
 }
 
 // Forget the saved location (for example if the class moves to another building)
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id } = await params;
-  const { response } = await guard(id);
+  const { response, user } = await guard(id);
   if (response) return response;
 
   const cls = await prisma.class.update({
@@ -79,5 +81,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     data: { venueLatitude: null, venueLongitude: null, venueAccuracy: null, venueSavedAt: null },
     select: SELECT,
   });
+  await audit(user, "CLASSROOM_LOCATION", `${user?.name} forgot the classroom location for ${cls.name}`, id);
   return NextResponse.json(cls);
 }

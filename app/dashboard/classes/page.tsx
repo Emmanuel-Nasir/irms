@@ -113,7 +113,15 @@ export default function ClassesPage() {
         <div className="space-y-3">
           {classes.map((c) => (
             <div key={c.id} className="rounded border border-navy/10 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-gold hover:shadow-md">
-              <p className="font-medium text-navy">{c.name}</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-medium text-navy">{c.name}</p>
+                <a
+                  href={`/dashboard/class/${c.id}`}
+                  className="shrink-0 rounded-full bg-navy px-3 py-1 text-xs font-medium text-parchment transition-all hover:bg-gold hover:text-navy"
+                >
+                  Open class →
+                </a>
+              </div>
               <p className="text-sm text-navy/60">
                 {c.semester.name} · {CATEGORY_LABELS[c.category] ?? c.category}
                 {c.dayOfWeek !== null && ` · ${DAYS[c.dayOfWeek]}`}

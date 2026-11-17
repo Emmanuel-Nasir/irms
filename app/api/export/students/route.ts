@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole, STAFF } from "@/lib/permissions";
+import { requireRole, STAFF, stakeScope } from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
   const auth = await requireRole(STAFF);
   if (!auth.ok) return auth.response;
 
-  const stake = req.nextUrl.searchParams.get("stake");
+  // Leaders limited to a stake only ever get their own stake
+  const stake = stakeScope(auth.user) ?? req.nextUrl.searchParams.get("stake");
   const classId = req.nextUrl.searchParams.get("classId");
 
   const students = await prisma.student.findMany({
     where: {
-      ...(stake ? { stake } : {}),
+      ...(stake ? { stake: { equals: stake, mode: "insensitive" as const } } : {}),
       ...(classId ? { enrollments: { some: { classId } } } : {}),
     },
     include: {

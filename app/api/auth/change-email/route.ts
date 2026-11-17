@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 
 // Change your own sign-in email. Needs your current password, so someone who finds
 // your phone signed in can't take over the account.
@@ -30,5 +31,6 @@ export async function POST(req: NextRequest) {
   if (clash) return NextResponse.json({ error: "That email is already used by another account" }, { status: 409 });
 
   await prisma.user.update({ where: { id: user.id }, data: { email: newEmail } });
+  await audit({ id: user.id, name: user.name }, "EMAIL_CHANGED", `${user.name} changed their sign-in email from ${user.email} to ${newEmail}`, user.id);
   return NextResponse.json({ email: newEmail });
 }

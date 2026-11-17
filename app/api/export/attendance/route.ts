@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole, canManageClass, CLASS_MANAGERS } from "@/lib/permissions";
+import { requireRole, canManageClass, CLASS_MANAGERS, stakeScope } from "@/lib/permissions";
 import { dayKey, parseDayKey, daysBetween } from "@/lib/dates";
 
 const CODE: Record<string, string> = { PRESENT: "P", LATE: "L", EXCUSED: "E", ABSENT: "A" };
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const params = req.nextUrl.searchParams;
   const classId = params.get("classId");
-  const stake = params.get("stake");
+  const stake = stakeScope(auth.user) ?? params.get("stake");
 
   if (!classId) return NextResponse.json({ error: "Pick a class first" }, { status: 400 });
   if (!(await canManageClass(auth.user, classId))) {
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       where: {
         classId,
         status: { not: "DROPPED" },
-        ...(stake ? { student: { stake } } : {}),
+        ...(stake ? { student: { stake: { equals: stake, mode: "insensitive" as const } } } : {}),
       },
       include: { student: { include: { user: { select: { name: true, email: true } } } } },
     }),

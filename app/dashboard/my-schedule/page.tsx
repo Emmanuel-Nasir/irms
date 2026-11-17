@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import QrScanner from "@/app/components/QrScanner";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -80,7 +81,15 @@ export default function MySchedulePage() {
               <div className="space-y-2">
                 {data.enrollments.map((en) => (
                   <div key={en.id} className="rounded border border-navy/10 px-4 py-3">
-                    <p className="font-medium text-navy">{en.class.name}</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium text-navy">{en.class.name}</p>
+                      <Link
+                        href={`/dashboard/class/${en.class.id}`}
+                        className="shrink-0 rounded-full bg-navy px-3 py-1 text-xs font-medium text-parchment transition-all hover:bg-gold hover:text-navy"
+                      >
+                        Open class →
+                      </Link>
+                    </div>
                     <p className="text-sm text-navy/60">
                       {en.class.semester.name}
                       {en.class.dayOfWeek !== null && ` · ${DAYS[en.class.dayOfWeek]}`}

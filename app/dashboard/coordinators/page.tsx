@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-type CoordinatorItem = { id: string; name: string; email: string };
+type CoordinatorItem = { id: string; name: string; email: string; stake?: string | null };
 
 export default function CoordinatorsPage() {
   const [coordinators, setCoordinators] = useState<CoordinatorItem[]>([]);
   const [name, setName] = useState(""); const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [stake, setStake] = useState("");
   const [loading, setLoading] = useState(false); const [error, setError] = useState("");
 
   async function loadCoordinators() {
@@ -23,7 +24,7 @@ export default function CoordinatorsPage() {
     const res = await fetch("/api/coordinators", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, stake }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -48,8 +49,10 @@ export default function CoordinatorsPage() {
             className="mb-3 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" required />
           <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
             className="mb-3 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" required />
-          <input placeholder="Temporary password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+          <input placeholder="Temporary password (8+, letter and number)" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
             className="mb-3 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" required />
+          <input placeholder="Stake (they'll only see this stake's students)" value={stake} onChange={(e) => setStake(e.target.value)}
+            className="mb-3 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" />
           <button type="submit" disabled={loading}
             className="rounded bg-navy px-4 py-2 font-medium text-parchment transition-all hover:bg-gold hover:text-navy disabled:opacity-50">
             {loading ? "Adding..." : "Add Coordinator"}
@@ -61,7 +64,7 @@ export default function CoordinatorsPage() {
           {coordinators.map((c) => (
             <div key={c.id} className="rounded border border-navy/10 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-gold hover:shadow-md">
               <p className="font-medium text-navy">{c.name}</p>
-              <p className="text-sm text-navy/60">{c.email}</p>
+              <p className="text-sm text-navy/60">{c.email}{c.stake ? ` · ${c.stake}` : ""}</p>
             </div>
           ))}
         </div>

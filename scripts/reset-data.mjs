@@ -17,7 +17,9 @@ const confirm = process.argv.includes("--confirm");
 const TABLES = [
   "EventRsvp",
   "Event",
+  "ResourceFile",
   "Resource",
+  "LessonPlan",
   "Announcement",
   "Attendance",
   "AttendanceSession",
@@ -27,6 +29,8 @@ const TABLES = [
   "Semester",
   "Student",
   "Teacher",
+  "LoginAttempt",
+  "AuditLog",
 ];
 
 const url = process.env.DATABASE_URL;

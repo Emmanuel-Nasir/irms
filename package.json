@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "reset-data": "node scripts/reset-data.mjs",
+    "reset-two-factor": "node scripts/reset-two-factor.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

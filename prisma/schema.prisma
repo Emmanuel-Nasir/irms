@@ -78,6 +78,22 @@ model User {
   // Sign-in protection: after 5 wrong passwords in a row the account waits 15 minutes
   failedLoginCount Int       @default(0)
   lockedUntil      DateTime?
+  // Goes up when the password changes, which signs this account out on every other device
+  sessionVersion   Int       @default(0)
+  lastLoginAt      DateTime?
+  // Set when an admin creates the account or resets its password: the person must
+  // choose their own password before they can use IRMS
+  mustChangePassword Boolean @default(false)
+
+  // Stake admins and coordinators only see students of this stake (empty = not limited yet)
+  stake            String?
+
+  // Two-step sign-in with an authenticator app. The secret is stored encrypted;
+  // recovery codes are stored only as hashes.
+  totpSecret       String?
+  totpEnabledAt    DateTime?
+  totpLastStep     Int?
+  recoveryCodes    String[]  @default([])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -123,6 +139,32 @@ model Teacher {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Every sign-in attempt, by network address, so one address can't guess passwords
+// across many accounts. Old rows are cleared automatically.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  ip        String
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+}
+
+// Who did what, and when. Written by the app; never edited or deleted by it.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actorName String
+  action    String
+  summary   String
+  targetId  String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
 }
 
 // ------------------------------------------------------------
@@ -177,6 +219,7 @@ model Class {
   attendanceSessions AttendanceSession[]
   announcements      Announcement[]
   resources          Resource[]
+  lessonPlans        LessonPlan[]
 
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
@@ -336,4 +379,39 @@ model Resource {
   uploadedById String
 
   createdAt DateTime @default(now())
+
+  // LINK (Drive, YouTube, a website) or FILE (uploaded, kept in ResourceFile)
+  kind        String  @default("LINK")
+  description String?
+  fileName    String?
+  mimeType    String?
+  size        Int?
+  file        ResourceFile?
+}
+
+// The bytes of an uploaded file, kept apart so lists of materials stay fast
+model ResourceFile {
+  resourceId String   @id
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  data       Bytes
+}
+
+// A teacher's plan for one lesson. Students only see plans marked "shared".
+model LessonPlan {
+  id          String    @id @default(cuid())
+  classId     String
+  class       Class     @relation(fields: [classId], references: [id])
+  date        DateTime?
+  title       String
+  scriptures  String?
+  objectives  String?
+  activities  String?
+  notes       String?
+  status      String    @default("DRAFT") // DRAFT, READY, TAUGHT
+  shared      Boolean   @default(false)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([classId, date])
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
+import { QrCode, Users } from "lucide-react";
 import { getBestLocation, type Fix } from "@/lib/browserLocation";
 
 type Session = { token: string; expiresAt: string; locationSource?: "venue" | "device" | null } | null;
@@ -58,6 +59,7 @@ export default function ClassAttendancePage() {
   const [note, setNote] = useState<Note>(null);
   const [justArrived, setJustArrived] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [tab, setTab] = useState<"qr" | "list">("qr");
   const fixRef = useRef<Fix | null>(null);
   const verifyRef = useRef(true);
   const scannedRef = useRef<Set<string> | null>(null);
@@ -282,9 +284,48 @@ export default function ClassAttendancePage() {
           {cls ? `${cls.name}${cls.venue ? ` · ${cls.venue}` : ""}` : " "}
         </p>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[400px_1fr]">
+        {/* Tabs: the QR code can go on a projector while the class list stays one tap away */}
+        <div className="mx-auto mb-6 flex w-full max-w-md rounded-full bg-white/10 p-1 backdrop-blur" role="tablist">
+          {([
+            { id: "qr", label: "QR code", icon: QrCode },
+            { id: "list", label: "Class list", icon: Users },
+          ] as const).map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`relative flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-300 ${
+                tab === t.id ? "bg-gold text-navy shadow-lg" : "text-parchment/80 hover:text-parchment"
+              }`}
+            >
+              <t.icon size={16} />
+              {t.label}
+              {t.id === "list" && roster && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${tab === t.id ? "bg-navy text-parchment" : "bg-white/15"}`}
+                >
+                  {attending}/{roster.total}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Pops up on either tab when a student scans in */}
+        {justArrived && (
+          <div className="irms-toast fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full bg-sage px-5 py-2.5 text-sm font-medium text-white shadow-2xl">
+            ✓ {justArrived} just checked in
+          </div>
+        )}
+
+        <div>
           {/* QR code and location */}
-          <div className="flex flex-col items-center self-start rounded-lg border-t-4 border-gold bg-parchment p-6 shadow-2xl sm:p-8">
+          <div
+            key="qr"
+            hidden={tab !== "qr"}
+            className="irms-enter-up mx-auto flex max-w-md flex-col items-center rounded-lg border-t-4 border-gold bg-parchment p-6 shadow-2xl sm:p-8"
+          >
             {note && (
               <p
                 className={`mb-4 w-full rounded border px-3 py-2 text-left text-xs ${
@@ -383,7 +424,11 @@ export default function ClassAttendancePage() {
           </div>
 
           {/* Class list */}
-          <div className="rounded-lg border-t-4 border-gold bg-parchment p-5 shadow-2xl sm:p-6">
+          <div
+            key="list"
+            hidden={tab !== "list"}
+            className="irms-enter-up mx-auto max-w-3xl rounded-lg border-t-4 border-gold bg-parchment p-5 shadow-2xl sm:p-6"
+          >
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 className="font-display text-xl text-navy">Class list</h2>
@@ -402,11 +447,6 @@ export default function ClassAttendancePage() {
               </div>
             </div>
 
-            {justArrived && (
-              <div className="mb-3 rounded border border-sage/40 bg-sage/10 px-3 py-2 text-sm font-medium text-sage">
-                ✓ {justArrived} just checked in
-              </div>
-            )}
             {flagged > 0 && (
               <div className="mb-3 rounded border border-clay/30 bg-clay/10 px-3 py-2 text-xs text-clay">
                 {flagged} student{flagged !== 1 ? "s" : ""} checked in from a phone that also checked in someone else.
