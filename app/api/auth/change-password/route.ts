@@ -9,12 +9,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "You must be logged in" }, { status: 401 });
   }
 
-  const { currentPassword, newPassword } = await req.json();
+  const { currentPassword, newPassword } = await req.json().catch(() => ({}));
   if (!currentPassword || !newPassword) {
     return NextResponse.json({ error: "Current and new password are required" }, { status: 400 });
   }
-  if (newPassword.length < 6) {
-    return NextResponse.json({ error: "New password must be at least 6 characters" }, { status: 400 });
+  if (typeof newPassword !== "string" || newPassword.length < 8) {
+    return NextResponse.json({ error: "New password must be at least 8 characters" }, { status: 400 });
   }
 
   const user = await prisma.user.findUnique({ where: { id: currentUser.userId } });

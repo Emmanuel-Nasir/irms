@@ -3,6 +3,11 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 
+// After this many wrong passwords in a row, the account waits before it can try again.
+// Stops someone guessing passwords; a super admin resetting the password unlocks it.
+const MAX_FAILED = 5;
+const LOCK_MINUTES = 15;
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const email = typeof body.email === "string" ? body.email.trim() : "";
@@ -17,6 +22,17 @@ export async function POST(req: NextRequest) {
     where: { email: { equals: email, mode: "insensitive" } },
   });
 
+  if (user?.lockedUntil && user.lockedUntil > new Date()) {
+    const minutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+    return NextResponse.json(
+      {
+        error: `Too many wrong passwords. Try again in ${minutes} minute${minutes !== 1 ? "s" : ""}, or ask your coordinator to reset your password.`,
+        code: "LOCKED",
+      },
+      { status: 429 }
+    );
+  }
+
   let valid = false;
   if (user) {
     valid = await bcrypt.compare(password, user.passwordHash);
@@ -27,7 +43,21 @@ export async function POST(req: NextRequest) {
   }
 
   if (!user || !valid) {
-    return NextResponse.json({ error: "Incorrect email or password" }, { status: 401 });
+    if (user) {
+      const failed = user.failedLoginCount + 1;
+      await prisma.user.update({
+        where: { id: user.id },
+        data:
+          failed >= MAX_FAILED
+            ? { failedLoginCount: 0, lockedUntil: new Date(Date.now() + LOCK_MINUTES * 60000) }
+            : { failedLoginCount: failed },
+      });
+    }
+    return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
+  }
+
+  if (user.failedLoginCount > 0 || user.lockedUntil) {
+    await prisma.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: null } });
   }
 
   const secret = process.env.JWT_SECRET;

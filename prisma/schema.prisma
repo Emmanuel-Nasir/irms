@@ -74,6 +74,10 @@ model User {
   email        String   @unique
   passwordHash String
   role         Role
+
+  // Sign-in protection: after 5 wrong passwords in a row the account waits 15 minutes
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -211,6 +215,8 @@ model AttendanceSession {
   expiresAt DateTime
   latitude  Float?
   longitude Float?
+  // How precise that position is, in metres (added to the distance students are allowed)
+  accuracy  Float?
 
   createdAt DateTime @default(now())
 }
@@ -227,7 +233,8 @@ model Attendance {
   date      DateTime
   status    AttendanceStatus
 
-  verifiedById String?
+  verifiedById String?   // set when a teacher marked this by hand
+  deviceId     String?   // which phone checked in (to spot one phone checking in two students)
 
   createdAt DateTime          @default(now())
 

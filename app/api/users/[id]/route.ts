@@ -15,15 +15,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const target = await prisma.user.findUnique({ where: { id } });
   if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-  const data: { name?: string; email?: string; role?: AppRole; passwordHash?: string } = {};
+  const data: {
+    name?: string;
+    email?: string;
+    role?: AppRole;
+    passwordHash?: string;
+    failedLoginCount?: number;
+    lockedUntil?: Date | null;
+  } = {};
 
   if (name) data.name = name;
 
-  if (email && email !== target.email) {
-    if (await prisma.user.findUnique({ where: { email } })) {
+  if (email && email.trim().toLowerCase() !== target.email.toLowerCase()) {
+    const clash = await prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: "insensitive" }, NOT: { id } },
+    });
+    if (clash) {
       return NextResponse.json({ error: "That email is already used" }, { status: 409 });
     }
-    data.email = email;
+    data.email = email.trim().toLowerCase();
   }
 
   if (role && role !== target.role) {
@@ -44,6 +54,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
     data.passwordHash = await bcrypt.hash(newPassword, 10);
+    // A new password also lifts any lock from too many wrong attempts
+    data.failedLoginCount = 0;
+    data.lockedUntil = null;
   }
 
   const updated = await prisma.user.update({

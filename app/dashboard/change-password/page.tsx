@@ -1,74 +1,176 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-export default function ChangePasswordPage() {
+type Me = { name: string; email: string; role: string } | null;
+type Result = { ok: boolean; text: string } | null;
+
+function Message({ result }: { result: Result }) {
+  if (!result) return null;
+  return (
+    <p
+      className={`mb-4 rounded border px-3 py-2 text-sm ${
+        result.ok ? "border-sage/30 bg-sage/10 text-sage" : "border-clay/30 bg-clay/10 text-clay"
+      }`}
+    >
+      {result.text}
+    </p>
+  );
+}
+
+export default function MyAccountPage() {
+  const [me, setMe] = useState<Me>(null);
+
+  const [newEmail, setNewEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [emailResult, setEmailResult] = useState<Result>(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [pwResult, setPwResult] = useState<Result>(null);
+  const [pwBusy, setPwBusy] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    fetch("/api/auth/me").then((r) => r.json()).then(setMe).catch(() => {});
+  }, []);
+
+  async function changeEmail(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setSuccess(false);
-
-    if (newPassword !== confirmPassword) {
-      setError("New passwords don't match");
+    setEmailResult(null);
+    setEmailBusy(true);
+    const res = await fetch("/api/auth/change-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newEmail, password: emailPassword }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setEmailBusy(false);
+    if (!res.ok) {
+      setEmailResult({ ok: false, text: data.error ?? "Something went wrong" });
       return;
     }
+    setMe((m) => m && { ...m, email: data.email });
+    try {
+      localStorage.setItem("irms:email", data.email);
+    } catch {}
+    setEmailResult({ ok: true, text: `Done. Sign in with ${data.email} from now on.` });
+    setNewEmail("");
+    setEmailPassword("");
+  }
 
-    setLoading(true);
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwResult(null);
+    if (newPassword.length < 8) {
+      setPwResult({ ok: false, text: "Use at least 8 characters." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwResult({ ok: false, text: "The new passwords don't match." });
+      return;
+    }
+    setPwBusy(true);
     const res = await fetch("/api/auth/change-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentPassword, newPassword }),
     });
-    setLoading(false);
-
+    const data = await res.json().catch(() => ({}));
+    setPwBusy(false);
     if (!res.ok) {
-      const data = await res.json();
-      setError(data.error ?? "Something went wrong");
+      setPwResult({ ok: false, text: data.error ?? "Something went wrong" });
       return;
     }
-
-    setSuccess(true);
-    setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+    setPwResult({ ok: true, text: "Password changed. Use the new one next time you sign in." });
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
   }
 
+  const card = "rounded border-t-4 border-gold bg-white p-6 shadow-sm";
+  const label = "mb-1 block text-sm font-medium text-navy/80";
+  const input = "mb-4 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold";
+  const button =
+    "rounded bg-navy px-4 py-2 font-medium text-parchment transition-all hover:bg-gold hover:text-navy disabled:opacity-50";
+
   return (
-    <div className="min-h-screen bg-parchment px-8 py-10">
-      <h1 className="mb-6 font-display text-2xl text-navy">Change Password</h1>
-
-      <form onSubmit={handleSubmit} className="max-w-md rounded border-t-4 border-gold bg-white p-6 shadow-sm">
-        {error && (
-          <p className="mb-3 rounded border border-clay/30 bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p>
+    <div className="min-h-screen bg-parchment px-4 py-8 sm:px-8 sm:py-10">
+      <h1 className="mb-1 font-display text-2xl text-navy">My Account</h1>
+      <p className="mb-6 text-sm text-navy/60">
+        {me ? (
+          <>
+            Signed in as <b>{me.name}</b> ({me.email})
+          </>
+        ) : (
+          " "
         )}
-        {success && (
-          <p className="mb-3 rounded border border-sage/30 bg-sage/10 px-3 py-2 text-sm text-sage">
-            Password changed successfully.
-          </p>
-        )}
+      </p>
 
-        <label className="mb-1 block text-sm font-medium text-navy/80">Current Password</label>
-        <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)}
-          className="mb-4 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" required />
+      <div className="grid max-w-4xl gap-6 md:grid-cols-2">
+        <form onSubmit={changeEmail} className={card}>
+          <h2 className="mb-4 font-display text-lg text-navy">Change sign-in email</h2>
+          <Message result={emailResult} />
+          <label className={label}>New email</label>
+          <input
+            type="email"
+            autoCapitalize="none"
+            autoComplete="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            className={input}
+            required
+          />
+          <label className={label}>Current password</label>
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={emailPassword}
+            onChange={(e) => setEmailPassword(e.target.value)}
+            className={input}
+            required
+          />
+          <button type="submit" disabled={emailBusy} className={button}>
+            {emailBusy ? "Saving..." : "Change Email"}
+          </button>
+        </form>
 
-        <label className="mb-1 block text-sm font-medium text-navy/80">New Password</label>
-        <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-          className="mb-4 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" required />
-
-        <label className="mb-1 block text-sm font-medium text-navy/80">Confirm New Password</label>
-        <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-          className="mb-6 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" required />
-
-        <button type="submit" disabled={loading}
-          className="rounded bg-navy px-4 py-2 font-medium text-parchment transition-all hover:bg-gold hover:text-navy disabled:opacity-50">
-          {loading ? "Updating..." : "Update Password"}
-        </button>
-      </form>
+        <form onSubmit={changePassword} className={card}>
+          <h2 className="mb-4 font-display text-lg text-navy">Change password</h2>
+          <Message result={pwResult} />
+          <label className={label}>Current password</label>
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            className={input}
+            required
+          />
+          <label className={label}>New password (at least 8 characters)</label>
+          <input
+            type="password"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className={input}
+            required
+          />
+          <label className={label}>Confirm new password</label>
+          <input
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className={input}
+            required
+          />
+          <button type="submit" disabled={pwBusy} className={button}>
+            {pwBusy ? "Updating..." : "Update Password"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

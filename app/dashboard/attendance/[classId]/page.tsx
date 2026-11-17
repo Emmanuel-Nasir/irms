@@ -3,10 +3,19 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { getLocation, type Fix } from "@/lib/browserLocation";
+import { getBestLocation, type Fix } from "@/lib/browserLocation";
 
 type Session = { token: string; expiresAt: string; locationSource?: "venue" | "device" | null } | null;
-type AttendanceRecord = { id: string; student: { user: { name: string } }; status: string };
+type Mark = "PRESENT" | "LATE" | "EXCUSED" | "ABSENT";
+type RosterStudent = {
+  studentId: string;
+  name: string;
+  status: Exclude<Mark, "ABSENT"> | null;
+  markedByTeacher: boolean;
+  checkedInAt: string | null;
+  sharedWith: string[];
+};
+type Roster = { students: RosterStudent[]; total: number; present: number; late: number; excused: number };
 type ClassVenue = {
   name: string;
   venue: string | null;
@@ -17,13 +26,21 @@ type ClassVenue = {
 };
 type Note = { good: boolean; text: string } | null;
 
-// A live position rougher than this can't check students fairly
-const MAX_TEACHER_ACCURACY = 300;
-// Saving the classroom location needs a precise position (the server checks this too)
-const MAX_VENUE_ACCURACY = 100;
+// A position is only trusted as "where the class is" if it's this precise (the server checks too)
+const MAX_TRUSTED_ACCURACY = 100;
+
+const MARK_BUTTONS: { mark: Mark; label: string; on: string }[] = [
+  { mark: "PRESENT", label: "P", on: "bg-sage text-white" },
+  { mark: "LATE", label: "L", on: "bg-gold text-navy" },
+  { mark: "EXCUSED", label: "E", on: "bg-navy/70 text-white" },
+  { mark: "ABSENT", label: "A", on: "bg-clay text-white" },
+];
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 export default function ClassAttendancePage() {
@@ -31,16 +48,19 @@ export default function ClassAttendancePage() {
   const classId = params.classId as string;
   const [cls, setCls] = useState<ClassVenue | null>(null);
   const [session, setSession] = useState<Session>(null);
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [roster, setRoster] = useState<Roster | null>(null);
+  const [search, setSearch] = useState("");
   const [active, setActive] = useState(false);
   const [busy, setBusy] = useState<"start" | "save" | "retry" | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
   const [deviceFix, setDeviceFix] = useState<Fix | null>(null);
   const [verify, setVerify] = useState(true);
   const [note, setNote] = useState<Note>(null);
   const [justArrived, setJustArrived] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
   const fixRef = useRef<Fix | null>(null);
   const verifyRef = useRef(true);
-  const prevCountRef = useRef<number | null>(null);
+  const scannedRef = useRef<Set<string> | null>(null);
 
   const hasVenue = cls?.venueLatitude != null && cls?.venueLongitude != null;
   const canCheck = hasVenue || !!deviceFix;
@@ -50,25 +70,31 @@ export default function ClassAttendancePage() {
     if (res.ok) setCls(await res.json());
   }, [classId]);
 
-  const loadRecords = useCallback(async () => {
-    const res = await fetch(`/api/attendance?classId=${classId}`);
+  const loadRoster = useCallback(async () => {
+    const res = await fetch(`/api/attendance/roster?classId=${classId}`);
     if (!res.ok) return;
-    const data: AttendanceRecord[] = await res.json();
-    if (prevCountRef.current !== null && data.length > prevCountRef.current) {
-      setJustArrived(data[data.length - 1].student.user.name);
-      setTimeout(() => setJustArrived(null), 2500);
+    const data: Roster = await res.json();
+    // Announce students who have just scanned in (not ones the teacher marked)
+    const scanned = new Set(data.students.filter((s) => s.status && !s.markedByTeacher).map((s) => s.studentId));
+    if (scannedRef.current) {
+      const fresh = data.students.find((s) => scanned.has(s.studentId) && !scannedRef.current!.has(s.studentId));
+      if (fresh) {
+        setJustArrived(fresh.name);
+        setTimeout(() => setJustArrived(null), 3000);
+      }
     }
-    prevCountRef.current = data.length;
-    setRecords(data);
+    scannedRef.current = scanned;
+    setRoster(data);
   }, [classId]);
 
   // The server measures students from the saved classroom location if there is one,
-  // otherwise from this device's live position (sent here when we have a good one)
+  // otherwise from this device's live position (sent here only when it's precise)
   const createSession = useCallback(async () => {
     const body: Record<string, unknown> = { classId, checkLocation: verifyRef.current };
     if (fixRef.current) {
       body.latitude = fixRef.current.latitude;
       body.longitude = fixRef.current.longitude;
+      body.accuracy = fixRef.current.accuracy;
     }
     const res = await fetch("/api/attendance/sessions", {
       method: "POST",
@@ -78,15 +104,20 @@ export default function ClassAttendancePage() {
     if (res.ok) setSession(await res.json());
   }, [classId]);
 
+  function locate() {
+    setProgress(null);
+    return getBestLocation({ goodEnough: 20, maxWaitMs: 15000, onProgress: (f) => setProgress(Math.round(f.accuracy)) });
+  }
+
   // Used only when no classroom location is saved: try this device's own position
   async function findDeviceLocation() {
-    const geo = await getLocation();
-    if (geo.ok && geo.fix.accuracy <= MAX_TEACHER_ACCURACY) {
+    const geo = await locate();
+    if (geo.ok && geo.fix.accuracy <= MAX_TRUSTED_ACCURACY) {
       fixRef.current = geo.fix;
       setDeviceFix(geo.fix);
       setNote({
         good: true,
-        text: `Location check is on, using this device's position (to about ${Math.round(geo.fix.accuracy)} m). Save it as the classroom location below, and next time any device can run attendance here.`,
+        text: `Location check is on, using this device's position (to about ${Math.round(geo.fix.accuracy)} m). Save it as the classroom location below and next time any device can run attendance here.`,
       });
       return;
     }
@@ -96,11 +127,11 @@ export default function ClassAttendancePage() {
       good: false,
       text:
         (geo.ok
-          ? `This device can only find its location to about ${Math.round(geo.fix.accuracy)} m, which is too rough to check students fairly.`
+          ? `This device only knows its location to about ${Math.round(geo.fix.accuracy)} m, which is too rough to check students fairly.`
           : geo.reason === "denied"
           ? "Location is blocked in this browser."
           : "This device couldn't find its location.") +
-        " Students can check in without a location check. To check location, save the classroom location once from a phone inside the room.",
+        " Students can still check in, without a location check. To check location, save the classroom location once from a phone inside the room.",
     });
   }
 
@@ -130,7 +161,7 @@ export default function ClassAttendancePage() {
   async function saveVenue() {
     setBusy("save");
     setNote(null);
-    const geo = await getLocation();
+    const geo = await locate();
     if (!geo.ok) {
       setNote({
         good: false,
@@ -142,10 +173,10 @@ export default function ClassAttendancePage() {
       setBusy(null);
       return;
     }
-    if (geo.fix.accuracy > MAX_VENUE_ACCURACY) {
+    if (geo.fix.accuracy > MAX_TRUSTED_ACCURACY) {
       setNote({
         good: false,
-        text: `This device only knows its position to about ${Math.round(geo.fix.accuracy)} m. Save the classroom location from a phone inside the room with Location on (it needs to be within ${MAX_VENUE_ACCURACY} m). Moving near a window helps.`,
+        text: `This device only knows its position to about ${Math.round(geo.fix.accuracy)} m. Save the classroom location from a phone inside the room with Location on (it needs to be within ${MAX_TRUSTED_ACCURACY} m). Standing near a window helps.`,
       });
       setBusy(null);
       return;
@@ -180,6 +211,28 @@ export default function ClassAttendancePage() {
     }
   }
 
+  async function mark(studentId: string, status: Mark) {
+    setSaving(studentId);
+    // Show the change straight away; the next refresh confirms it
+    setRoster((r) =>
+      r && {
+        ...r,
+        students: r.students.map((s) =>
+          s.studentId === studentId
+            ? { ...s, status: status === "ABSENT" ? null : status, markedByTeacher: status !== "ABSENT" }
+            : s
+        ),
+      }
+    );
+    await fetch("/api/attendance/roster", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ classId, studentId, status }),
+    });
+    setSaving(null);
+    loadRoster();
+  }
+
   function toggleVerify(next: boolean) {
     setVerify(next);
     verifyRef.current = next;
@@ -191,20 +244,15 @@ export default function ClassAttendancePage() {
     setSession(null);
   }
 
-  async function removeCheckin(id: string) {
-    await fetch(`/api/attendance/${id}`, { method: "DELETE" });
-    loadRecords();
-  }
-
   useEffect(() => {
     loadClass();
   }, [loadClass]);
 
   useEffect(() => {
-    loadRecords();
-    const interval = setInterval(loadRecords, 5000);
+    loadRoster();
+    const interval = setInterval(loadRoster, 5000);
     return () => clearInterval(interval);
-  }, [loadRecords]);
+  }, [loadRoster]);
 
   useEffect(() => {
     if (!active) return;
@@ -217,54 +265,26 @@ export default function ClassAttendancePage() {
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/checkin/${session.token}`
     : "";
 
+  const finding = () => (progress === null ? "Finding location..." : `Finding location (±${progress} m)...`);
   const smallButton =
     "rounded border border-navy/20 px-3 py-1 text-sm text-navy transition-colors hover:border-gold hover:text-gold disabled:opacity-60";
 
-  const venueBox = (
-    <div className="mt-6 w-full rounded border border-navy/10 bg-white/60 p-4 text-left">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-navy/50">Classroom location</p>
-      {hasVenue && cls?.venueSavedAt ? (
-        <>
-          <p className="text-sm text-navy">
-            Saved on {formatDate(cls.venueSavedAt)}
-            {cls.venueAccuracy != null && ` (to about ${Math.round(cls.venueAccuracy)} m)`}. Any device can run
-            attendance here with location checking.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={saveVenue} disabled={busy !== null} className={smallButton}>
-              {busy === "save" ? "Finding location..." : "Update from this device"}
-            </button>
-            <button onClick={forgetVenue} disabled={busy !== null} className={`${smallButton} hover:border-clay hover:text-clay`}>
-              Forget
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-sm text-navy">
-            Not saved yet. Stand in the room with a phone and save it once. After that, any device, even a laptop,
-            can run attendance with location checking.
-          </p>
-          <button onClick={saveVenue} disabled={busy !== null} className={`${smallButton} mt-3`}>
-            {busy === "save" ? "Finding location..." : "Save this room's location"}
-          </button>
-        </>
-      )}
-    </div>
-  );
+  const q = search.trim().toLowerCase();
+  const shown = (roster?.students ?? []).filter((s) => !q || s.name.toLowerCase().includes(q));
+  const attending = roster ? roster.present + roster.late : 0;
+  const flagged = (roster?.students ?? []).filter((s) => s.sharedWith.length > 0).length;
 
   return (
     <div className="min-h-screen bg-navy">
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-        <h1 className="mb-1 text-center font-display text-3xl tracking-wide text-parchment">
-          Attendance Check-In
-        </h1>
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <h1 className="mb-1 text-center font-display text-3xl tracking-wide text-parchment">Attendance</h1>
         <p className="mb-8 text-center text-sm text-parchment/70">
-          {cls ? `${cls.name}${cls.venue ? ` · ${cls.venue}` : ""}` : "\u00a0"}
+          {cls ? `${cls.name}${cls.venue ? ` · ${cls.venue}` : ""}` : " "}
         </p>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[420px_1fr]">
-          <div className="flex flex-col items-center rounded-lg border-t-4 border-gold bg-parchment p-8 shadow-2xl">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[400px_1fr]">
+          {/* QR code and location */}
+          <div className="flex flex-col items-center self-start rounded-lg border-t-4 border-gold bg-parchment p-6 shadow-2xl sm:p-8">
             {note && (
               <p
                 className={`mb-4 w-full rounded border px-3 py-2 text-left text-xs ${
@@ -279,10 +299,10 @@ export default function ClassAttendancePage() {
               <>
                 {session ? (
                   <>
-                    <div className="rounded-lg bg-white p-6 shadow-inner">
-                      <QRCodeSVG value={checkinUrl} size={260} />
+                    <div className="rounded-lg bg-white p-5 shadow-inner">
+                      <QRCodeSVG value={checkinUrl} size={240} />
                     </div>
-                    <p className="mt-5 break-all text-center text-xs text-navy/50">{checkinUrl}</p>
+                    <p className="mt-4 break-all text-center text-xs text-navy/50">{checkinUrl}</p>
                     <button onClick={() => navigator.clipboard.writeText(checkinUrl)} className={`${smallButton} mt-2`}>
                       Copy link
                     </button>
@@ -298,13 +318,13 @@ export default function ClassAttendancePage() {
                   </label>
                 ) : (
                   <button onClick={retryLocation} disabled={busy !== null} className={`${smallButton} mt-4`}>
-                    {busy === "retry" ? "Finding location..." : "Try finding location again"}
+                    {busy === "retry" ? finding() : "Try finding location again"}
                   </button>
                 )}
 
                 <p className="mt-4 flex items-center gap-2 text-sm text-navy/60">
                   <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-sage" />
-                  Live: a new code every 60 seconds (each works for 3 minutes)
+                  New code every 60 seconds (each works for 3 minutes)
                 </p>
                 <button
                   onClick={stopAttendance}
@@ -319,59 +339,147 @@ export default function ClassAttendancePage() {
                 disabled={busy !== null}
                 className="rounded bg-navy px-8 py-4 text-lg font-medium text-parchment transition-all hover:scale-105 hover:bg-gold hover:text-navy disabled:opacity-60"
               >
-                {busy === "start" ? "Finding your location..." : "Start Attendance"}
+                {busy === "start" ? finding() : "Start Attendance"}
               </button>
             )}
 
-            {venueBox}
+            <div className="mt-6 w-full rounded border border-navy/10 bg-white/60 p-4 text-left">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-navy/50">Classroom location</p>
+              {hasVenue && cls?.venueSavedAt ? (
+                <>
+                  <p className="text-sm text-navy">
+                    Saved on {formatDate(cls.venueSavedAt)}
+                    {cls.venueAccuracy != null && ` (to about ${Math.round(cls.venueAccuracy)} m)`}. Any device can run
+                    attendance here with location checking.
+                  </p>
+                  <p className="mt-1 text-xs text-navy/50">
+                    If students in the room are told they&apos;re too far, update it from a phone standing in the room.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button onClick={saveVenue} disabled={busy !== null} className={smallButton}>
+                      {busy === "save" ? finding() : "Update from this device"}
+                    </button>
+                    <button
+                      onClick={forgetVenue}
+                      disabled={busy !== null}
+                      className={`${smallButton} hover:border-clay hover:text-clay`}
+                    >
+                      Forget
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-navy">
+                    Not saved yet. Stand in the room with a phone and save it once. After that any device, even a
+                    laptop, can run attendance with location checking.
+                  </p>
+                  <button onClick={saveVenue} disabled={busy !== null} className={`${smallButton} mt-3`}>
+                    {busy === "save" ? finding() : "Save this room's location"}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="rounded-lg border-t-4 border-gold bg-parchment p-6 shadow-2xl">
-            <div className="mb-4 flex items-baseline justify-between">
-              <h2 className="font-display text-xl text-navy">Checked In</h2>
-              <span className="rounded-full bg-sage px-3 py-1 text-sm font-semibold text-white">
-                {records.length}
-              </span>
+          {/* Class list */}
+          <div className="rounded-lg border-t-4 border-gold bg-parchment p-5 shadow-2xl sm:p-6">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="font-display text-xl text-navy">Class list</h2>
+                <p className="text-xs text-navy/50">Tap P, L, E or A to mark anyone by hand.</p>
+              </div>
+              <div className="text-right">
+                <p className="font-display text-3xl leading-none text-navy">
+                  {attending}
+                  <span className="text-lg text-navy/40"> / {roster?.total ?? 0}</span>
+                </p>
+                <p className="mt-1 text-xs text-navy/60">
+                  here today
+                  {roster && roster.late > 0 && ` · ${roster.late} late`}
+                  {roster && roster.excused > 0 && ` · ${roster.excused} excused`}
+                </p>
+              </div>
             </div>
 
             {justArrived && (
-              <div className="mb-3 animate-pulse rounded border border-sage/40 bg-sage/10 px-3 py-2 text-sm font-medium text-sage">
+              <div className="mb-3 rounded border border-sage/40 bg-sage/10 px-3 py-2 text-sm font-medium text-sage">
                 ✓ {justArrived} just checked in
               </div>
             )}
+            {flagged > 0 && (
+              <div className="mb-3 rounded border border-clay/30 bg-clay/10 px-3 py-2 text-xs text-clay">
+                {flagged} student{flagged !== 1 ? "s" : ""} checked in from a phone that also checked in someone else.
+                Make sure each of them is really here.
+              </div>
+            )}
 
-            {records.length === 0 ? (
-              <p className="py-8 text-center text-sm text-navy/40">
-                No one has checked in yet. The room fills up here as students scan.
+            {(roster?.total ?? 0) > 8 && (
+              <input
+                placeholder="Search names"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="mb-3 w-full rounded border border-navy/20 bg-white px-3 py-2 text-sm outline-none focus:border-gold"
+              />
+            )}
+
+            {!roster ? (
+              <p className="py-8 text-center text-sm text-navy/40">Loading the class list...</p>
+            ) : roster.total === 0 ? (
+              <p className="py-8 text-center text-sm text-navy/50">
+                No students are enrolled in this class yet. Enroll them on the Enrollments page.
               </p>
             ) : (
               <div className="space-y-2">
-                {records.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center justify-between rounded border border-navy/10 bg-white px-4 py-3 shadow-sm"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy font-display text-sm text-parchment">
-                        {r.student.user.name.charAt(0)}
-                      </span>
-                      <span className="font-medium text-navy">{r.student.user.name}</span>
+                {shown.map((s) => {
+                  const current: Mark = s.status ?? "ABSENT";
+                  return (
+                    <div
+                      key={s.studentId}
+                      className={`flex flex-wrap items-center justify-between gap-3 rounded border bg-white px-3 py-2.5 shadow-sm ${
+                        s.sharedWith.length ? "border-clay/40" : "border-navy/10"
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy font-display text-sm text-parchment">
+                          {s.name.charAt(0)}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-navy">{s.name}</p>
+                          <p className="text-xs text-navy/50">
+                            {!s.status
+                              ? "Not checked in"
+                              : s.markedByTeacher
+                              ? "Marked by teacher"
+                              : `Scanned in${s.checkedInAt ? ` at ${formatTime(s.checkedInAt)}` : ""}`}
+                          </p>
+                          {s.sharedWith.length > 0 && (
+                            <p className="text-xs font-medium text-clay">Same phone as {s.sharedWith.join(", ")}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex overflow-hidden rounded border border-navy/15" role="group" aria-label={`Mark ${s.name}`}>
+                        {MARK_BUTTONS.map((b) => (
+                          <button
+                            key={b.mark}
+                            onClick={() => current !== b.mark && mark(s.studentId, b.mark)}
+                            disabled={saving === s.studentId}
+                            title={b.mark.charAt(0) + b.mark.slice(1).toLowerCase()}
+                            className={`w-9 py-1.5 text-xs font-semibold transition-colors ${
+                              current === b.mark ? b.on : "bg-white text-navy/50 hover:bg-parchment hover:text-navy"
+                            }`}
+                          >
+                            {b.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="rounded-full bg-sage/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sage">
-                        {r.status}
-                      </span>
-                      <button
-                        onClick={() => removeCheckin(r.id)}
-                        className="text-xs text-clay transition-colors hover:underline"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
+                {shown.length === 0 && <p className="py-4 text-center text-sm text-navy/50">No names match.</p>}
               </div>
             )}
+            <p className="mt-4 text-xs text-navy/50">P present · L late · E excused · A absent</p>
           </div>
         </div>
       </div>

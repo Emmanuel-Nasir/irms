@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole, canManageClass, CLASS_MANAGERS } from "@/lib/permissions";
 import { startOfToday, todayKey, dayRange } from "@/lib/dates";
+import { MAX_VENUE_ACCURACY_METERS } from "@/lib/geo";
 
 // The teacher's screen shows a new code every 60 seconds, but each code keeps
 // working for 3 minutes. Finding a phone's location can take up to 30 seconds and
@@ -23,24 +24,34 @@ export async function POST(req: NextRequest) {
 
   const cls = await prisma.class.findUnique({
     where: { id: classId },
-    select: { venueLatitude: true, venueLongitude: true },
+    select: { venueLatitude: true, venueLongitude: true, venueAccuracy: true },
   });
   if (!cls) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
   // Where students are measured from: the saved classroom location if there is one
-  // (it was saved deliberately, from a phone in the room), otherwise wherever the
-  // teacher's device is right now. checkLocation: false switches the check off.
+  // (it was saved deliberately, from a phone in the room), otherwise the teacher's
+  // device, but only if it knows its position precisely. A rough position (typical
+  // of laptops) would wrongly reject students, so then there's no location check.
+  // checkLocation: false switches the check off.
   let latitude: number | null = null;
   let longitude: number | null = null;
+  let accuracy: number | null = null;
   let locationSource: "venue" | "device" | null = null;
   if (body.checkLocation !== false) {
     if (cls.venueLatitude != null && cls.venueLongitude != null) {
       latitude = cls.venueLatitude;
       longitude = cls.venueLongitude;
+      accuracy = cls.venueAccuracy;
       locationSource = "venue";
-    } else if (typeof body.latitude === "number" && typeof body.longitude === "number") {
+    } else if (
+      typeof body.latitude === "number" &&
+      typeof body.longitude === "number" &&
+      typeof body.accuracy === "number" &&
+      body.accuracy <= MAX_VENUE_ACCURACY_METERS
+    ) {
       latitude = body.latitude;
       longitude = body.longitude;
+      accuracy = body.accuracy;
       locationSource = "device";
     }
   }
@@ -53,6 +64,7 @@ export async function POST(req: NextRequest) {
       expiresAt: new Date(Date.now() + CODE_LIFETIME_MS),
       latitude,
       longitude,
+      accuracy,
     },
   });
   return NextResponse.json({ ...session, locationSource }, { status: 201 });

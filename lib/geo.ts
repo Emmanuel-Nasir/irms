@@ -10,17 +10,28 @@ export function distanceInMeters(lat1: number, lon1: number, lat2: number, lon2:
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export const BASE_CHECKIN_METERS = 300;
+// How far from the classroom a student may be before any GPS uncertainty is added
+export const BASE_CHECKIN_METERS = 200;
 
-// A classroom location is only saved if the device knew its position this precisely
+// A position is only trusted as "where the class is" if it is this precise.
+// Applies both to saving a classroom location and to a teacher's live position.
+// (Laptops guess from Wi-Fi and are often far less precise, or confidently wrong.)
 export const MAX_VENUE_ACCURACY_METERS = 100;
 
-// How far from the class a student may be: the base radius plus however
-// uncertain the phone says its own position is (capped so it can't be abused)
-export function allowedDistance(studentAccuracy?: number): number {
-  const extra =
-    typeof studentAccuracy === "number" && Number.isFinite(studentAccuracy)
-      ? Math.min(Math.max(studentAccuracy, 0), 1000)
-      : 0;
-  return BASE_CHECKIN_METERS + extra;
+// Caps so a phone reporting a huge uncertainty can't check in from anywhere
+const MAX_STUDENT_EXTRA = 500;
+const MAX_CLASSROOM_EXTRA = MAX_VENUE_ACCURACY_METERS;
+
+function clamp(value: number | null | undefined, max: number) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.min(Math.max(value, 0), max) : 0;
+}
+
+// How far a student may be: the base radius, plus how unsure the student's phone is,
+// plus how unsure the saved classroom position was. Both readings can be off, so both count.
+export function allowedDistance(studentAccuracy?: number | null, classroomAccuracy?: number | null): number {
+  return (
+    BASE_CHECKIN_METERS +
+    clamp(studentAccuracy, MAX_STUDENT_EXTRA) +
+    clamp(classroomAccuracy, MAX_CLASSROOM_EXTRA)
+  );
 }

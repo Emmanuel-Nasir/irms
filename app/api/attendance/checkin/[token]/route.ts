@@ -1,11 +1,17 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
 import { distanceInMeters, allowedDistance } from "@/lib/geo";
 import { dayKey, dayRange } from "@/lib/dates";
 
-function fail(error: string, code: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
+// A random ID kept in a cookie on each phone, so the teacher can see when one phone
+// checks in two different students. It identifies the browser, not the person.
+const DEVICE_COOKIE = "irms_device";
+const ONE_YEAR = 60 * 60 * 24 * 365;
+
+function fail(error: string, code: string, status: number, extra: Record<string, unknown> = {}) {
+  return NextResponse.json({ error, code, ...extra }, { status });
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -13,13 +19,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const body = await req.json().catch(() => ({}));
   const latitude = typeof body.latitude === "number" ? body.latitude : null;
   const longitude = typeof body.longitude === "number" ? body.longitude : null;
-  const accuracy = typeof body.accuracy === "number" ? body.accuracy : undefined;
+  const accuracy = typeof body.accuracy === "number" ? body.accuracy : null;
 
   const auth = await requireRole(["STUDENT"]);
   if (!auth.ok) return auth.response;
 
   const student = await prisma.student.findUnique({ where: { userId: auth.user.id } });
-  if (!student) return fail("Only students can check in", "NOT_STUDENT", 403);
+  if (!student) return fail("Only students can check in.", "NOT_STUDENT", 403);
 
   const session = await prisma.attendanceSession.findUnique({
     where: { token },
@@ -35,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const enrollment = await prisma.enrollment.findUnique({
     where: { studentId_classId: { studentId: student.id, classId: session.classId } },
   });
-  if (!enrollment) {
+  if (!enrollment || enrollment.status === "DROPPED") {
     return fail("You are not enrolled in this class. Ask your coordinator to enroll you.", "NOT_ENROLLED", 403);
   }
 
@@ -44,35 +50,60 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       return fail("Your location is needed to check in.", "LOCATION_REQUIRED", 400);
     }
     const distance = distanceInMeters(session.latitude, session.longitude, latitude, longitude);
-    const allowed = allowedDistance(accuracy);
+    const allowed = allowedDistance(accuracy, session.accuracy);
     if (distance > allowed) {
       return fail(
-        `You appear to be about ${Math.round(distance)} m from the class location (the limit is ${Math.round(allowed)} m).`,
+        `Your phone puts you about ${Math.round(distance)} m from the classroom. Check-in works within ${Math.round(allowed)} m.`,
         "TOO_FAR",
-        403
+        403,
+        {
+          distance: Math.round(distance),
+          allowed: Math.round(allowed),
+          studentAccuracy: accuracy === null ? null : Math.round(accuracy),
+        }
       );
     }
   }
+
+  const deviceId = req.cookies.get(DEVICE_COOKIE)?.value || crypto.randomUUID();
 
   // One record per student, per class, per day. Look it up by the whole day so a
   // second scan (or a record saved by older code) updates it instead of adding another.
   const existing = await prisma.attendance.findFirst({
     where: { studentId: student.id, classId: session.classId, date: dayRange(dayKey(session.date)) },
   });
-  const alreadyCheckedIn = existing?.status === "PRESENT";
+  // Scanning doesn't undo "Late" from the teacher; it does turn "Absent" or "Excused" into "Present"
+  const alreadyCheckedIn = existing?.status === "PRESENT" || existing?.status === "LATE";
 
   const attendance = existing
-    ? await prisma.attendance.update({ where: { id: existing.id }, data: { status: "PRESENT" } })
+    ? await prisma.attendance.update({
+        where: { id: existing.id },
+        data: alreadyCheckedIn ? { deviceId: existing.deviceId ?? deviceId } : { status: "PRESENT", deviceId },
+      })
     : await prisma.attendance.upsert({
         where: {
           studentId_classId_date: { studentId: student.id, classId: session.classId, date: session.date },
         },
-        update: { status: "PRESENT" },
-        create: { studentId: student.id, classId: session.classId, date: session.date, status: "PRESENT" },
+        update: { status: "PRESENT", deviceId },
+        create: {
+          studentId: student.id,
+          classId: session.classId,
+          date: session.date,
+          status: "PRESENT",
+          deviceId,
+        },
       });
 
-  return NextResponse.json(
-    { ...attendance, className: session.class.name, alreadyCheckedIn },
+  const res = NextResponse.json(
+    { id: attendance.id, status: attendance.status, className: session.class.name, alreadyCheckedIn },
     { status: alreadyCheckedIn ? 200 : 201 }
   );
+  res.cookies.set(DEVICE_COOKIE, deviceId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: ONE_YEAR,
+    path: "/",
+  });
+  return res;
 }

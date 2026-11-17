@@ -28,7 +28,7 @@ const NAV: NavItem[] = [
   { href: "/dashboard/announcements", label: "Announcements", icon: Megaphone, roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
   { href: "/dashboard/reports", label: "Reports", icon: FileText, roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
   { href: "/dashboard/export", label: "Export Data", icon: Download, roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR"] },
-  { href: "/dashboard/change-password", label: "Change Password", icon: KeyRound, roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR", "TEACHER", "STUDENT"] },
+  { href: "/dashboard/change-password", label: "My Account", icon: KeyRound, roles: ["AREA_ADMIN", "STAKE_ADMIN", "COORDINATOR", "TEACHER", "STUDENT"] },
 ];
 
 type CurrentUser = { name: string; role: string } | null;
