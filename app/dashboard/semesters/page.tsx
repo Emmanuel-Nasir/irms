@@ -39,7 +39,7 @@ export default function SemestersPage() {
 
       <main className="mx-auto max-w-3xl px-8 py-10">
         <form onSubmit={handleSubmit} className="mb-8 rounded border-l-4 border-gold bg-white p-6 shadow-sm">
-          <input placeholder="Semester name (e.g. 2026 Semester 1)" value={name} onChange={(e) => setName(e.target.value)}
+          <input placeholder="Semester name (e.g. Semester 1, 2026)" value={name} onChange={(e) => setName(e.target.value)}
             className="mb-3 w-full rounded border border-navy/20 px-3 py-2 outline-none focus:border-gold" required />
           <div className="mb-3 flex gap-3">
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}

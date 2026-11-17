@@ -159,6 +159,13 @@ model Class {
   startTime  String?
   venue      String?
   capacity   Int?
+
+  // Where the class actually meets, saved once from a phone in the room.
+  // Check-ins are measured against this, so any device can run attendance.
+  venueLatitude  Float?
+  venueLongitude Float?
+  venueAccuracy  Float?
+  venueSavedAt   DateTime?
   archived   Boolean       @default(false)
 
   enrollments        Enrollment[]

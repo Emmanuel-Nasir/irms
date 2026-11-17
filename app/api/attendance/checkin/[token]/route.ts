@@ -1,63 +1,78 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
-import { distanceInMeters, MAX_CHECKIN_DISTANCE_METERS } from "@/lib/geo";
+import { requireRole } from "@/lib/permissions";
+import { distanceInMeters, allowedDistance } from "@/lib/geo";
+import { dayKey, dayRange } from "@/lib/dates";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
-) {
+function fail(error: string, code: string, status: number) {
+  return NextResponse.json({ error, code }, { status });
+}
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const { latitude, longitude } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const latitude = typeof body.latitude === "number" ? body.latitude : null;
+  const longitude = typeof body.longitude === "number" ? body.longitude : null;
+  const accuracy = typeof body.accuracy === "number" ? body.accuracy : undefined;
 
-  const currentUser = await getCurrentUser();
-  if (!currentUser) {
-    return NextResponse.json({ error: "You must be logged in to check in" }, { status: 401 });
-  }
+  const auth = await requireRole(["STUDENT"]);
+  if (!auth.ok) return auth.response;
 
-  const student = await prisma.student.findUnique({ where: { userId: currentUser.userId } });
-  if (!student) {
-    return NextResponse.json({ error: "Only students can check in" }, { status: 403 });
-  }
+  const student = await prisma.student.findUnique({ where: { userId: auth.user.id } });
+  if (!student) return fail("Only students can check in", "NOT_STUDENT", 403);
 
-  const session = await prisma.attendanceSession.findUnique({ where: { token } });
+  const session = await prisma.attendanceSession.findUnique({
+    where: { token },
+    include: { class: { select: { name: true } } },
+  });
   if (!session) {
-    return NextResponse.json({ error: "This QR code is invalid" }, { status: 404 });
+    return fail("This QR code isn't valid. Scan the code that's on screen now.", "INVALID", 404);
   }
   if (session.expiresAt < new Date()) {
-    return NextResponse.json({ error: "This QR code has expired — ask the teacher for the current one" }, { status: 410 });
-  }
-
-  if (session.latitude != null && session.longitude != null) {
-    if (latitude == null || longitude == null) {
-      return NextResponse.json(
-        { error: "Location access is required to check in" },
-        { status: 400 }
-      );
-    }
-    const distance = distanceInMeters(session.latitude, session.longitude, latitude, longitude);
-    if (distance > MAX_CHECKIN_DISTANCE_METERS) {
-      return NextResponse.json(
-        { error: "You don't appear to be at the class location" },
-        { status: 403 }
-      );
-    }
+    return fail("This QR code has expired. Scan the code that's on screen now.", "EXPIRED", 410);
   }
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { studentId_classId: { studentId: student.id, classId: session.classId } },
   });
   if (!enrollment) {
-    return NextResponse.json({ error: "You are not enrolled in this class" }, { status: 403 });
+    return fail("You are not enrolled in this class. Ask your coordinator to enroll you.", "NOT_ENROLLED", 403);
   }
 
-  const attendance = await prisma.attendance.upsert({
-    where: {
-      studentId_classId_date: { studentId: student.id, classId: session.classId, date: session.date },
-    },
-    update: { status: "PRESENT" },
-    create: { studentId: student.id, classId: session.classId, date: session.date, status: "PRESENT" },
-  });
+  if (session.latitude != null && session.longitude != null) {
+    if (latitude === null || longitude === null) {
+      return fail("Your location is needed to check in.", "LOCATION_REQUIRED", 400);
+    }
+    const distance = distanceInMeters(session.latitude, session.longitude, latitude, longitude);
+    const allowed = allowedDistance(accuracy);
+    if (distance > allowed) {
+      return fail(
+        `You appear to be about ${Math.round(distance)} m from the class location (the limit is ${Math.round(allowed)} m).`,
+        "TOO_FAR",
+        403
+      );
+    }
+  }
 
-  return NextResponse.json(attendance, { status: 201 });
+  // One record per student, per class, per day. Look it up by the whole day so a
+  // second scan (or a record saved by older code) updates it instead of adding another.
+  const existing = await prisma.attendance.findFirst({
+    where: { studentId: student.id, classId: session.classId, date: dayRange(dayKey(session.date)) },
+  });
+  const alreadyCheckedIn = existing?.status === "PRESENT";
+
+  const attendance = existing
+    ? await prisma.attendance.update({ where: { id: existing.id }, data: { status: "PRESENT" } })
+    : await prisma.attendance.upsert({
+        where: {
+          studentId_classId_date: { studentId: student.id, classId: session.classId, date: session.date },
+        },
+        update: { status: "PRESENT" },
+        create: { studentId: student.id, classId: session.classId, date: session.date, status: "PRESENT" },
+      });
+
+  return NextResponse.json(
+    { ...attendance, className: session.class.name, alreadyCheckedIn },
+    { status: alreadyCheckedIn ? 200 : 201 }
+  );
 }

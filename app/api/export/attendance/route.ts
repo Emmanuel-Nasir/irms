@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, canManageClass, CLASS_MANAGERS } from "@/lib/permissions";
+import { dayKey, parseDayKey, daysBetween } from "@/lib/dates";
 
 const CODE: Record<string, string> = { PRESENT: "P", LATE: "L", EXCUSED: "E", ABSENT: "A" };
-
-// "2026-08-14" -> a Date at the start or end of that day
-function parseDay(value: string | null, endOfDay: boolean) {
-  if (!value) return null;
-  const [y, m, d] = value.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return endOfDay ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d);
-}
-
-function dayKey(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 export async function GET(req: NextRequest) {
   const auth = await requireRole(CLASS_MANAGERS);
@@ -35,9 +21,7 @@ export async function GET(req: NextRequest) {
   const cls = await prisma.class.findUnique({ where: { id: classId }, select: { name: true } });
   if (!cls) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
-  const from = parseDay(params.get("from"), false);
-  const to = parseDay(params.get("to"), true);
-  const dateFilter = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
+  const dateFilter = daysBetween(parseDayKey(params.get("from")), parseDayKey(params.get("to")));
 
   const [sessions, records, enrollments] = await Promise.all([
     prisma.attendanceSession.findMany({ where: { classId, date: dateFilter }, select: { date: true } }),

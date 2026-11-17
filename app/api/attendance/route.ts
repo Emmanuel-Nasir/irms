@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, canManageClass, CLASS_MANAGERS } from "@/lib/permissions";
-
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+import { todayKey, dayRange } from "@/lib/dates";
 
 export async function GET(req: NextRequest) {
   const auth = await requireRole(CLASS_MANAGERS);
@@ -19,7 +14,7 @@ export async function GET(req: NextRequest) {
   }
 
   const records = await prisma.attendance.findMany({
-    where: { classId, date: startOfToday() },
+    where: { classId, date: dayRange(todayKey()) },
     include: { student: { include: { user: { select: { name: true } } } } },
     orderBy: { createdAt: "asc" },
   });
