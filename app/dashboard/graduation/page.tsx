@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { CountUp, Meter, ProgressRing } from "@/app/components/Motion";
 import { Confetti, Reveal } from "@/app/components/Alive";
+import { askConfirm } from "@/app/components/Dialog";
 
 type ClassStanding = {
   enrollmentId: string;
@@ -93,7 +94,7 @@ export default function GraduationPage() {
 
   async function completeReady() {
     const n = (data ?? []).reduce((a, s) => a + s.classes.filter((c) => c.readyToComplete).length, 0);
-    if (!window.confirm(`Mark ${n} finished class${n !== 1 ? "es" : ""} as completed? Each one adds a credit.`)) return;
+    if (!(await askConfirm(`${n} finished class${n !== 1 ? "es" : ""} will be marked completed. Each one adds a credit.`, { title: "Complete finished classes?", confirmLabel: "Mark completed" }))) return;
     const out = await call("/api/graduation", "POST", { action: "complete-ready" });
     if (out) {
       flash(`${out.updated} class${out.updated !== 1 ? "es" : ""} completed. Credits updated.`);
@@ -110,7 +111,7 @@ export default function GraduationPage() {
   }
 
   async function graduate(s: Standing, yes: boolean) {
-    if (yes && !window.confirm(`Mark ${s.name} as graduated? 🎓`)) return;
+    if (yes && !(await askConfirm(`${s.name} will be marked as graduated. 🎓`, { title: "Mark as graduated?", confirmLabel: "Graduate" }))) return;
     const out = await call(`/api/graduation/${s.studentId}`, "PATCH", { action: yes ? "graduate" : "ungraduate" });
     if (out) {
       if (yes) setConfetti((n) => n + 1);

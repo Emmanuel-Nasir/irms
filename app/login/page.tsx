@@ -4,6 +4,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CircleAlert, Eye, EyeOff, KeyRound, LoaderCircle, Lock, Mail, ShieldCheck } from "lucide-react";
 import { IrmsMark, StakeLogo } from "@/app/components/Brand";
+import { showNotice } from "@/app/components/Dialog";
 
 const REMEMBER_KEY = "irms:email";
 
@@ -170,7 +171,7 @@ export default function LoginPage() {
         return;
       }
       if (typeof data.recoveryCodesLeft === "number" && data.recoveryCodesLeft <= 2) {
-        window.alert(`You have ${data.recoveryCodesLeft} recovery code(s) left. Make new ones under My Account.`);
+        await showNotice(`You have ${data.recoveryCodesLeft} recovery code${data.recoveryCodesLeft === 1 ? "" : "s"} left. Make new ones under My Account.`, { title: "Running low on recovery codes" });
       }
       setWelcome(data.user?.name?.split(" ")[0] ?? "");
       setTimeout(() => router.replace(nextPath()), 1100);

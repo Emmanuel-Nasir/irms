@@ -121,20 +121,24 @@ export function ProgressRing({
   stroke = 9,
   color = "#5B8266",
   label,
+  tone = "light",
 }: {
   percent: number;
   size?: number;
   stroke?: number;
   color?: string;
   label?: string;
+  // "dark" when the ring sits on a navy background
+  tone?: "light" | "dark";
 }) {
+  const dark = tone === "dark";
   const r = (size - stroke) / 2;
   const full = 2 * Math.PI * r;
   const clamped = Math.max(0, Math.min(100, percent));
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(0,48,87,0.1)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={dark ? "rgba(255,255,255,0.15)" : "rgba(0,48,87,0.1)"} strokeWidth={stroke} />
         <circle
           className="irms-ring"
           cx={size / 2}
@@ -150,10 +154,10 @@ export function ProgressRing({
         />
       </svg>
       <div className="absolute text-center">
-        <p className="font-display text-xl leading-none text-navy">
+        <p className={`font-display text-xl leading-none ${dark ? "text-parchment" : "text-navy"}`}>
           <CountUp value={Math.round(clamped)} suffix="%" />
         </p>
-        {label && <p className="mt-0.5 text-[10px] uppercase tracking-wider text-navy/50">{label}</p>}
+        {label && <p className={`mt-0.5 text-[10px] uppercase tracking-wider ${dark ? "text-parchment/60" : "text-navy/50"}`}>{label}</p>}
       </div>
     </div>
   );
@@ -165,13 +169,18 @@ export function BarChart({
   height = 120,
   color = "bg-navy",
   highlightLast = true,
+  max: fixedMax,
+  showValues = false,
 }: {
-  data: { label: string; value: number }[];
+  // color: a Tailwind bg class for just this bar; display: the text shown above it
+  data: { label: string; value: number; color?: string; display?: string }[];
   height?: number;
   color?: string;
   highlightLast?: boolean;
+  max?: number;
+  showValues?: boolean;
 }) {
-  const max = Math.max(1, ...data.map((d) => d.value));
+  const max = fixedMax ?? Math.max(1, ...data.map((d) => d.value));
   return (
     <div>
       <div className="flex items-end gap-1.5" style={{ height }}>
@@ -179,17 +188,21 @@ export function BarChart({
           const last = highlightLast && i === data.length - 1;
           return (
             <div key={d.label + i} className="group flex flex-1 flex-col items-center justify-end" style={{ height: "100%" }}>
-              <span className="mb-1 text-[10px] font-semibold text-navy/60 opacity-0 transition-opacity group-hover:opacity-100">
-                {d.value}
+              <span
+                className={`mb-1 text-[10px] font-semibold text-navy/60 transition-opacity ${
+                  showValues ? "" : "opacity-0 group-hover:opacity-100"
+                }`}
+              >
+                {d.display ?? d.value}
               </span>
               <div
-                className={`irms-bar w-full rounded-t-md ${last ? "bg-gold" : color} transition-all group-hover:brightness-125`}
+                className={`irms-bar w-full rounded-t-md ${d.color ?? (last ? "bg-gold" : color)} transition-all group-hover:brightness-110`}
                 style={{
                   height: `${Math.max(4, (d.value / max) * 100)}%`,
                   animationDelay: `${i * 0.06}s`,
                   opacity: d.value === 0 ? 0.25 : 1,
                 }}
-                title={`${d.label}: ${d.value}`}
+                title={`${d.label}: ${d.display ?? d.value}`}
               />
             </div>
           );

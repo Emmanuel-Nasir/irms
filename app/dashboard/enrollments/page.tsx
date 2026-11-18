@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, Trash2 } from "lucide-react";
+import { askConfirm } from "@/app/components/Dialog";
 
 type Student = { id: string; user: { name: string } };
 type ClassItem = { id: string; name: string; archived?: boolean };
@@ -86,7 +87,7 @@ export default function EnrollmentsPage() {
   }
 
   async function remove(en: Enrollment) {
-    if (!window.confirm(`Remove ${en.student.user.name} from ${en.class.name}? Their past attendance stays on record.`)) return;
+    if (!(await askConfirm(`${en.student.user.name} will be taken out of ${en.class.name}. Their past attendance stays on record.`, { title: "Remove from class?", confirmLabel: "Remove", danger: true }))) return;
     const res = await fetch(`/api/enrollments/${en.id}`, { method: "DELETE" });
     if (!res.ok) {
       setError((await res.json().catch(() => ({}))).error ?? "Something went wrong");

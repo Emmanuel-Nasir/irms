@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { QrCode, Users } from "lucide-react";
 import { getBestLocation, type Fix } from "@/lib/browserLocation";
+import { askConfirm } from "@/app/components/Dialog";
 
 type Session = { token: string; expiresAt: string; locationSource?: "venue" | "device" | null } | null;
 type Mark = "PRESENT" | "LATE" | "EXCUSED" | "ABSENT";
@@ -204,7 +205,7 @@ export default function ClassAttendancePage() {
   }
 
   async function forgetVenue() {
-    if (!window.confirm("Forget this classroom's saved location? Location checking will then depend on the device running attendance.")) return;
+    if (!(await askConfirm("Location checking will then depend on the device running attendance.", { title: "Forget the classroom location?", confirmLabel: "Forget it", danger: true }))) return;
     const res = await fetch(`/api/classes/${classId}/venue`, { method: "DELETE" });
     if (res.ok) {
       setCls(await res.json());

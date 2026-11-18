@@ -31,6 +31,8 @@ type Report = {
 
 const rateColor = (r: number | null) => (r === null ? "bg-navy/20" : r >= 75 ? "bg-sage" : r >= 50 ? "bg-gold" : "bg-clay");
 const rateText = (r: number | null) => (r === null ? "—" : `${r}%`);
+// Hex versions of the same colours, for the ring
+const ringColor = (r: number | null) => (r === null ? "#C9A227" : r >= 75 ? "#7FB38D" : r >= 50 ? "#C9A227" : "#D9776B");
 
 function downloadCsv(name: string, rows: (string | number | null)[][]) {
   const csv = rows
@@ -100,12 +102,12 @@ export default function ReportsPage() {
 
   const tiles = data
     ? [
-        { label: "Students", value: data.totals.students, icon: Users, tone: "text-navy" },
-        { label: "Classes", value: data.totals.classes, icon: School, tone: "text-navy" },
-        { label: "Check-ins", value: data.totals.checkins, icon: CheckCircle2, tone: "text-sage" },
-        { label: "At risk", value: data.totals.atRisk, icon: AlertTriangle, tone: "text-clay" },
-        { label: "Ready to graduate", value: data.totals.ready, icon: TrendingUp, tone: "text-gold" },
-        { label: "Graduated", value: data.totals.graduated, icon: GraduationCap, tone: "text-sage" },
+        { label: "Students", value: data.totals.students, icon: Users, tone: "bg-navy/10 text-navy", bar: "border-b-navy" },
+        { label: "Classes", value: data.totals.classes, icon: School, tone: "bg-navy/10 text-navy", bar: "border-b-navy-light" },
+        { label: "Check-ins", value: data.totals.checkins, icon: CheckCircle2, tone: "bg-sage/15 text-sage", bar: "border-b-sage" },
+        { label: "At risk", value: data.totals.atRisk, icon: AlertTriangle, tone: "bg-clay/15 text-clay", bar: "border-b-clay" },
+        { label: "Ready to graduate", value: data.totals.ready, icon: TrendingUp, tone: "bg-gold/20 text-navy", bar: "border-b-gold" },
+        { label: "Graduated", value: data.totals.graduated, icon: GraduationCap, tone: "bg-sage/15 text-sage", bar: "border-b-sage" },
       ]
     : [];
 
@@ -139,7 +141,7 @@ export default function ReportsPage() {
           </div>
           {data && (
             <div className="irms-pop rounded-2xl bg-white/10 p-3 backdrop-blur">
-              <ProgressRing percent={data.totals.rate ?? 0} size={110} label={data.totals.rate === null ? "No classes yet" : "Attendance"} color="#C9A227" />
+              <ProgressRing tone="dark" percent={data.totals.rate ?? 0} size={110} label={data.totals.rate === null ? "No classes yet" : "Attendance"} color={ringColor(data.totals.rate)} />
             </div>
           )}
         </div>
@@ -157,8 +159,8 @@ export default function ReportsPage() {
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               {tiles.map((t, i) => (
-                <div key={t.label} className="irms-enter-up rounded-2xl border border-navy/10 bg-white p-4 shadow-sm transition-transform hover:-translate-y-1" style={{ animationDelay: `${i * 0.05}s` }}>
-                  <t.icon size={18} className={t.tone} />
+                <div key={t.label} className={`irms-enter-up rounded-2xl border border-b-4 border-navy/10 ${t.bar} bg-white p-4 shadow-sm transition-transform hover:-translate-y-1`} style={{ animationDelay: `${i * 0.05}s` }}>
+                  <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full ${t.tone}`}><t.icon size={18} /></span>
                   <p className="mt-2 font-display text-2xl text-navy"><CountUp value={t.value} /></p>
                   <p className="text-[11px] uppercase tracking-widest text-navy/50">{t.label}</p>
                 </div>
@@ -180,11 +182,26 @@ export default function ReportsPage() {
                 </div>
                 <BarChart
                   key={trendMode + semester + weeks}
-                  height={160}
-                  color={trendMode === "rate" ? "bg-sage" : "bg-navy"}
-                  data={data.trend.map((t) => ({ label: t.label, value: trendMode === "rate" ? t.rate ?? 0 : t.checkins }))}
+                  height={170}
+                  showValues
+                  highlightLast={false}
+                  max={trendMode === "rate" ? 100 : undefined}
+                  data={data.trend.map((t, i) =>
+                    trendMode === "rate"
+                      ? { label: t.label, value: t.rate ?? 0, display: t.rate === null ? "" : `${t.rate}%`, color: t.rate === null ? "bg-navy/10" : rateColor(t.rate) }
+                      : { label: t.label, value: t.checkins, display: t.checkins ? String(t.checkins) : "", color: i === data.trend.length - 1 ? "bg-gradient-to-t from-gold to-gold/70" : "bg-gradient-to-t from-navy to-navy-light" }
+                  )}
                 />
-                <p className="mt-2 text-xs text-navy/45">Each bar is one week, labelled by its first day. The gold bar is this week.</p>
+                {trendMode === "rate" ? (
+                  <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-navy/55">
+                    <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-sage" /> 75% or more</span>
+                    <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-gold" /> 50–74%</span>
+                    <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-clay" /> Below 50%</span>
+                    <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-navy/10" /> No class that week</span>
+                  </p>
+                ) : (
+                  <p className="mt-3 text-xs text-navy/50">Each bar is one week, labelled by its first day. The gold bar is this week.</p>
+                )}
               </div>
             </Reveal>
 

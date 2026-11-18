@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarHeart, Check, ChevronDown, Clock, HelpCircle, MapPin, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import { AnimatedBackground } from "@/app/components/Motion";
 import { Confetti, Reveal } from "@/app/components/Alive";
+import { askConfirm } from "@/app/components/Dialog";
 
 type Rsvp = "GOING" | "MAYBE" | "NOT_GOING";
 type EventItem = {
@@ -123,7 +124,7 @@ export default function EventsPage() {
   }
 
   async function remove(ev: EventItem) {
-    if (!confirm(`Cancel "${ev.title}"? Everyone's replies will be removed too.`)) return;
+    if (!(await askConfirm(`"${ev.title}" will be removed, along with everyone's replies.`, { title: "Cancel this event?", confirmLabel: "Cancel event", cancelLabel: "Keep it", danger: true }))) return;
     const res = await fetch(`/api/events/${ev.id}`, { method: "DELETE" });
     if (!res.ok) return setError((await res.json().catch(() => ({}))).error ?? "Couldn't delete");
     load();

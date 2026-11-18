@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
+import { askConfirm } from "@/app/components/Dialog";
 
 type ClassItem = { id: string; name: string };
 type Announcement = {
@@ -37,7 +38,7 @@ export default function AnnouncementsPage() {
   }
 
   async function remove(a: Announcement) {
-    if (!window.confirm(`Delete "${a.title}"? Everyone who could see it will no longer see it.`)) return;
+    if (!(await askConfirm(`"${a.title}" will be removed for everyone who could see it.`, { title: "Delete this announcement?", confirmLabel: "Delete", danger: true }))) return;
     const res = await fetch(`/api/announcements/${a.id}`, { method: "DELETE" });
     if (!res.ok) {
       setError((await res.json().catch(() => ({}))).error ?? "Couldn't delete");

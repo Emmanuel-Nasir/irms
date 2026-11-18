@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CalendarDays, CheckCircle2, Lock, Pencil, PlayCircle, Trash2 } from "lucide-react";
 import { useConfirmPassword } from "@/app/components/ConfirmPassword";
+import { askConfirm } from "@/app/components/Dialog";
 
 type Semester = {
   id: string;
@@ -82,7 +83,7 @@ export default function SemestersPage() {
 
   async function setStatus(s: Semester, status: Semester["status"]) {
     if (status === "ACTIVE" && semesters.some((x) => x.status === "ACTIVE" && x.id !== s.id)) {
-      if (!window.confirm(`Make ${s.name} the active semester? The current active one will be closed.`)) return;
+      if (!(await askConfirm(`The current active semester will be closed and ${s.name} becomes active.`, { title: "Switch the active semester?", confirmLabel: "Make active" }))) return;
     }
     if (await send(`/api/semesters/${s.id}`, "PATCH", { status })) {
       flash(status === "ACTIVE" ? `${s.name} is now the active semester` : `${s.name} set to ${status.toLowerCase()}`);

@@ -10,6 +10,7 @@ import {
 import { AnimatedBackground, CountUp, Meter, ProgressRing } from "@/app/components/Motion";
 import { Reveal, Tilt, Waves } from "@/app/components/Alive";
 import ErrorScreen from "@/app/components/ErrorScreen";
+import { askConfirm } from "@/app/components/Dialog";
 
 type Hub = {
   id: string;
@@ -216,7 +217,7 @@ export default function ClassHubPage() {
   }
 
   async function deletePlan(p: Plan) {
-    if (!window.confirm(`Delete the lesson plan "${p.title}"?`)) return;
+    if (!(await askConfirm(`"${p.title}" will be deleted.`, { title: "Delete this lesson plan?", confirmLabel: "Delete", danger: true }))) return;
     if (await send(`/api/plans/${p.id}`, "DELETE")) {
       flash("Lesson plan deleted");
       loadPlans();
@@ -246,7 +247,7 @@ export default function ClassHubPage() {
   }
 
   async function removeMaterial(m: Material) {
-    if (!window.confirm(`Remove "${m.title}"?`)) return;
+    if (!(await askConfirm(`Students will no longer see "${m.title}".`, { title: "Remove this material?", confirmLabel: "Remove", danger: true }))) return;
     if (await send(`/api/materials/${m.id}`, "DELETE")) {
       flash("Material removed");
       loadMaterials();
@@ -265,7 +266,7 @@ export default function ClassHubPage() {
   }
 
   async function removePost(p: Post) {
-    if (!window.confirm(`Remove "${p.title}"?`)) return;
+    if (!(await askConfirm(`"${p.title}" will be removed for the whole class.`, { title: "Remove this post?", confirmLabel: "Remove", danger: true }))) return;
     if (await send(`/api/announcements/${p.id}`, "DELETE")) {
       flash("Announcement removed");
       loadPosts();
