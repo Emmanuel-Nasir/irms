@@ -26,6 +26,16 @@ type Hub = {
   nextLesson: { id: string; title: string; date: string | null; scriptures: string | null; status: string } | null;
   rate: { percent: number | null; attended: number; expected: number; classDays: number };
   roster: { id: string; name: string; email: string; attended: number; percent: number | null }[];
+  course?: {
+    startKey: string;
+    endKey: string;
+    totalClasses: number | null;
+    classesSoFar: number | null;
+    status: "upcoming" | "running" | "finished";
+    attended: number;
+    heldDays: number;
+    percent: number | null;
+  };
 };
 type Plan = {
   id: string;
@@ -331,6 +341,18 @@ export default function ClassHubPage() {
             <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 backdrop-blur">
               <User size={14} /> {hub.teacher ?? "No teacher yet"}
             </span>
+            {hub.course && (
+              <span className="flex items-center gap-1.5 rounded-full bg-gold/90 px-3 py-1 font-medium text-navy">
+                <CalendarDays size={14} />
+                {hub.course.totalClasses === null
+                  ? `${dayLabel(hub.course.startKey + "T12:00:00Z")} – ${dayLabel(hub.course.endKey + "T12:00:00Z")}`
+                  : hub.course.status === "upcoming"
+                  ? `${hub.course.totalClasses} classes · starts ${dayLabel(hub.course.startKey + "T12:00:00Z")}`
+                  : hub.course.status === "finished"
+                  ? `All ${hub.course.totalClasses} classes done`
+                  : `Class ${hub.course.classesSoFar} of ${hub.course.totalClasses}`}
+              </span>
+            )}
           </div>
           <div className="irms-enter-up mt-6 flex flex-wrap gap-3" style={{ animationDelay: "0.3s" }}>
             {edit ? (

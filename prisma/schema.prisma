@@ -84,6 +84,8 @@ model User {
   // Set when an admin creates the account or resets its password: the person must
   // choose their own password before they can use IRMS
   mustChangePassword Boolean @default(false)
+  // Notifications newer than this show as unread
+  notificationsSeenAt DateTime?
 
   // Stake admins and coordinators only see students of this stake (empty = not limited yet)
   stake            String?
@@ -205,6 +207,11 @@ model Class {
   startTime  String?
   venue      String?
   capacity   Int?
+
+  // When this course runs. Empty means "the whole semester". Together with dayOfWeek this
+  // gives the number of classes, shown to students as "Class 4 of 12".
+  startDate  DateTime?
+  endDate    DateTime?
 
   // Where the class actually meets, saved once from a phone in the room.
   // Check-ins are measured against this, so any device can run attendance.

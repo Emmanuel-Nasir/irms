@@ -292,13 +292,20 @@ body {
 .irms-nav-scroll::-webkit-scrollbar { width: 6px; }
 .irms-nav-scroll::-webkit-scrollbar-thumb { background: rgba(250, 249, 246, 0.2); border-radius: 9999px; }
 
+/* Confetti for graduations (see <Confetti>) */
+@keyframes irms-confetti {
+  0% { transform: translate3d(0, -10vh, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--irms-drift, 0px), 110vh, 0) rotate(var(--irms-turn, 720deg)); opacity: 0.9; }
+}
+.irms-confetti-piece { position: fixed; top: 0; z-index: 80; pointer-events: none; animation: irms-confetti linear forwards; }
+
 /* Respect phones and computers set to "reduce motion" */
 @media (prefers-reduced-motion: reduce) {
   .irms-orb, .irms-particle, .irms-spin-slow, .irms-pulse-ring, .irms-float, .irms-enter-up,
   .irms-enter-down, .irms-enter-left, .irms-ticker, .irms-shake, .irms-pop, .irms-shimmer-bar,
   .irms-shine::after, .irms-page-enter, .irms-page *, .irms-bar, .irms-meter, .irms-ring, .irms-glow,
   .irms-toast, .irms-gradient-pan, .irms-marquee, .irms-glow-border::before, .irms-wave, .irms-wave-slow,
-  .irms-bob, .irms-caret, .irms-ping, .irms-bounce-in {
+  .irms-bob, .irms-caret, .irms-ping, .irms-bounce-in, .irms-confetti-piece {
     animation: none !important;
   }
   .irms-particle { display: none; }

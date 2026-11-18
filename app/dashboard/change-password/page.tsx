@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TwoFactorCard from "@/app/components/TwoFactorCard";
+import ProfileCard from "@/app/components/ProfileCard";
 
 type Me = { name: string; email: string; role: string } | null;
 type Result = { ok: boolean; text: string } | null;
@@ -130,6 +131,8 @@ export default function MyAccountPage() {
           </p>
         </div>
       )}
+
+      {!mustChange && <ProfileCard />}
 
       <div className="grid max-w-4xl gap-6 md:grid-cols-2">
         <form onSubmit={changeEmail} className={card}>

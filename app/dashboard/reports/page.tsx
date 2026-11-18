@@ -1,68 +1,303 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { AlertTriangle, BarChart3, CheckCircle2, Download, GraduationCap, School, TrendingUp, Users } from "lucide-react";
+import { AnimatedBackground, BarChart, CountUp, Meter, ProgressRing } from "@/app/components/Motion";
+import { Reveal } from "@/app/components/Alive";
 
-type ReportData = {
-  totals: { students: number; teachers: number; classes: number; stakes: number; activeSemester: string };
-  stakes: { stake: string; studentCount: number; barPct: number; classes: { name: string; count: number }[] }[];
+type Report = {
+  scope: string | null;
+  semesters: { id: string; name: string; status: string }[];
+  semesterId: string | null;
+  totals: { students: number; classes: number; enrolled: number; rate: number | null; checkins: number; atRisk: number; ready: number; graduated: number };
+  trend: { label: string; from: string; checkins: number; rate: number | null }[];
+  byClass: {
+    id: string;
+    name: string;
+    teacher: string | null;
+    creditType: string;
+    archived: boolean;
+    enrolled: number;
+    completed: number;
+    heldDays: number;
+    attended: number;
+    rate: number | null;
+    atRisk: number;
+  }[];
+  byStake: { stake: string; students: number; enrolled: number; attended: number; rate: number | null; atRisk: number; graduated: number }[];
+  bySemester: { id: string; name: string; status: string; classes: number; enrolled: number; rate: number | null }[];
 };
 
+const rateColor = (r: number | null) => (r === null ? "bg-navy/20" : r >= 75 ? "bg-sage" : r >= 50 ? "bg-gold" : "bg-clay");
+const rateText = (r: number | null) => (r === null ? "—" : `${r}%`);
+
+function downloadCsv(name: string, rows: (string | number | null)[][]) {
+  const csv = rows
+    .map((r) => r.map((v) => {
+      const s = v === null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(","))
+    .join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ReportsPage() {
-  const [data, setData] = useState<ReportData | null>(null);
+  const [semester, setSemester] = useState("active");
+  const [weeks, setWeeks] = useState(12);
+  const [data, setData] = useState<Report | null>(null);
+  const [error, setError] = useState("");
+  const [trendMode, setTrendMode] = useState<"rate" | "checkins">("rate");
+  const [sort, setSort] = useState<"rate" | "name" | "enrolled" | "atRisk">("rate");
 
+  const load = useCallback(async () => {
+    setError("");
+    const res = await fetch(`/api/reports/overview?semester=${semester}&weeks=${weeks}`);
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) setData(body);
+    else setError(body.error ?? "Couldn't load reports");
+  }, [semester, weeks]);
   useEffect(() => {
-    fetch("/api/reports/stakes").then((res) => res.json()).then(setData);
-  }, []);
+    load();
+  }, [load]);
 
-  if (!data) {
-    return <div className="min-h-screen bg-parchment p-8 text-navy/50">Loading...</div>;
+  const classes = useMemo(() => {
+    if (!data) return [];
+    const list = [...data.byClass];
+    if (sort === "name") list.sort((a, b) => a.name.localeCompare(b.name));
+    if (sort === "enrolled") list.sort((a, b) => b.enrolled - a.enrolled);
+    if (sort === "atRisk") list.sort((a, b) => b.atRisk - a.atRisk);
+    if (sort === "rate") list.sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
+    return list;
+  }, [data, sort]);
+
+  function exportClasses() {
+    if (!data) return;
+    downloadCsv("irms-classes.csv", [
+      ["Class", "Teacher", "Credit", "Enrolled", "Completed", "Days held", "Check-ins", "Attendance %", "At risk"],
+      ...data.byClass.map((c) => [c.name, c.teacher, c.creditType, c.enrolled, c.completed, c.heldDays, c.attended, c.rate, c.atRisk]),
+    ]);
+  }
+  function exportStakes() {
+    if (!data) return;
+    downloadCsv("irms-stakes.csv", [
+      ["Stake", "Students", "Enrollments", "Check-ins", "Attendance %", "At risk", "Graduated"],
+      ...data.byStake.map((s) => [s.stake, s.students, s.enrolled, s.attended, s.rate, s.atRisk, s.graduated]),
+    ]);
+  }
+  function exportTrend() {
+    if (!data) return;
+    downloadCsv("irms-weekly-trend.csv", [["Week starting", "Check-ins", "Attendance %"], ...data.trend.map((t) => [t.from, t.checkins, t.rate])]);
   }
 
-  const stats = [
-    { label: "Students", value: data.totals.students },
-    { label: "Teachers", value: data.totals.teachers },
-    { label: "Classes", value: data.totals.classes },
-    { label: "Stakes", value: data.totals.stakes },
-  ];
+  const card = "rounded-2xl border border-navy/10 bg-white p-5 shadow-sm";
+  const pick = "rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-parchment outline-none backdrop-blur [&>option]:text-navy";
+
+  const tiles = data
+    ? [
+        { label: "Students", value: data.totals.students, icon: Users, tone: "text-navy" },
+        { label: "Classes", value: data.totals.classes, icon: School, tone: "text-navy" },
+        { label: "Check-ins", value: data.totals.checkins, icon: CheckCircle2, tone: "text-sage" },
+        { label: "At risk", value: data.totals.atRisk, icon: AlertTriangle, tone: "text-clay" },
+        { label: "Ready to graduate", value: data.totals.ready, icon: TrendingUp, tone: "text-gold" },
+        { label: "Graduated", value: data.totals.graduated, icon: GraduationCap, tone: "text-sage" },
+      ]
+    : [];
 
   return (
-    <div className="min-h-screen bg-parchment px-8 py-10">
-      <h1 className="mb-1 font-display text-2xl text-navy">Reports</h1>
-      <p className="mb-8 text-sm text-navy/60">Active semester: {data.totals.activeSemester}</p>
-
-      <div className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {stats.map((s) => (
-          <div key={s.label} className="rounded border-t-4 border-gold bg-white p-5 text-center shadow-sm">
-            <p className="font-display text-3xl text-navy">{s.value}</p>
-            <p className="text-xs uppercase tracking-widest text-navy/50">{s.label}</p>
+    <div className="min-h-screen bg-parchment pb-12">
+      <section className="irms-gradient-pan relative overflow-hidden bg-gradient-to-br from-navy via-navy-light to-navy px-4 pb-20 pt-8 text-parchment sm:px-8">
+        <AnimatedBackground tone="dark" fixed={false} />
+        <div className="relative z-10 mx-auto flex max-w-6xl flex-wrap items-end gap-6">
+          <div className="flex-1">
+            <p className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-gold">
+              <BarChart3 size={14} /> Reports & charts
+            </p>
+            <h1 className="irms-enter-left mt-2 font-display text-3xl sm:text-4xl">How the institute is doing</h1>
+            <p className="mt-1 text-sm text-parchment/70">
+              {data?.scope ? `Showing ${data.scope} Stake only.` : "Every stake, every class."} Attendance % counts only days a class actually met.
+            </p>
           </div>
-        ))}
-      </div>
+          <div className="flex flex-wrap gap-2">
+            <select value={semester} onChange={(e) => setSemester(e.target.value)} className={pick}>
+              <option value="active">Active semester</option>
+              <option value="all">All semesters</option>
+              {data?.semesters.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <select value={weeks} onChange={(e) => setWeeks(Number(e.target.value))} className={pick}>
+              {[4, 8, 12, 26].map((w) => (
+                <option key={w} value={w}>Last {w} weeks</option>
+              ))}
+            </select>
+          </div>
+          {data && (
+            <div className="irms-pop rounded-2xl bg-white/10 p-3 backdrop-blur">
+              <ProgressRing percent={data.totals.rate ?? 0} size={110} label={data.totals.rate === null ? "No classes yet" : "Attendance"} color="#C9A227" />
+            </div>
+          )}
+        </div>
+      </section>
 
-      <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-navy/50">By Stake</p>
-      <div className="space-y-4">
-        {data.stakes.map((s) => (
-          <div key={s.stake} className="rounded border-t-4 border-gold bg-white p-6 shadow-sm">
-            <div className="mb-2 flex items-baseline justify-between">
-              <p className="font-display text-lg text-navy">{s.stake}</p>
-              <span className="text-sm font-semibold text-navy/70">
-                {s.studentCount} student{s.studentCount !== 1 ? "s" : ""}
-              </span>
+      <div className="relative z-10 mx-auto -mt-12 max-w-6xl space-y-6 px-4 sm:px-8">
+        {error && <p className="rounded-xl border border-clay/30 bg-white px-4 py-3 text-sm text-clay shadow">{error}</p>}
+        {!data && !error && (
+          <div className={`${card} flex items-center justify-center py-16`}>
+            <BarChart3 className="irms-bob text-navy/25" size={40} />
+          </div>
+        )}
+
+        {data && (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {tiles.map((t, i) => (
+                <div key={t.label} className="irms-enter-up rounded-2xl border border-navy/10 bg-white p-4 shadow-sm transition-transform hover:-translate-y-1" style={{ animationDelay: `${i * 0.05}s` }}>
+                  <t.icon size={18} className={t.tone} />
+                  <p className="mt-2 font-display text-2xl text-navy"><CountUp value={t.value} /></p>
+                  <p className="text-[11px] uppercase tracking-widest text-navy/50">{t.label}</p>
+                </div>
+              ))}
             </div>
-            <div className="mb-3 h-2.5 w-full overflow-hidden rounded-full bg-navy/10">
-              <div className="h-full rounded-full bg-sage transition-all duration-700" style={{ width: `${s.barPct}%` }} />
-            </div>
-            {s.classes.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {s.classes.map((c) => (
-                  <span key={c.name} className="rounded-full bg-navy/5 px-3 py-1 text-xs text-navy/70">
-                    {c.name} · {c.count}
-                  </span>
-                ))}
+
+            <Reveal>
+              <div className={card}>
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                  <h2 className="font-display text-lg text-navy">Week by week</h2>
+                  <div className="ml-auto flex rounded-full bg-navy/5 p-1 text-xs">
+                    {(["rate", "checkins"] as const).map((m) => (
+                      <button key={m} onClick={() => setTrendMode(m)} className={`rounded-full px-3 py-1 transition-colors ${trendMode === m ? "bg-navy text-parchment" : "text-navy/60"}`}>
+                        {m === "rate" ? "Attendance %" : "Check-ins"}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={exportTrend} className="flex items-center gap-1 text-xs text-navy/60 hover:text-gold"><Download size={14} /> CSV</button>
+                </div>
+                <BarChart
+                  key={trendMode + semester + weeks}
+                  height={160}
+                  color={trendMode === "rate" ? "bg-sage" : "bg-navy"}
+                  data={data.trend.map((t) => ({ label: t.label, value: trendMode === "rate" ? t.rate ?? 0 : t.checkins }))}
+                />
+                <p className="mt-2 text-xs text-navy/45">Each bar is one week, labelled by its first day. The gold bar is this week.</p>
               </div>
-            )}
-          </div>
-        ))}
+            </Reveal>
+
+            <Reveal>
+              <div className={card}>
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                  <h2 className="font-display text-lg text-navy">Classes</h2>
+                  <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="ml-auto rounded border border-navy/20 px-2 py-1 text-xs outline-none focus:border-gold">
+                    <option value="rate">Lowest attendance first</option>
+                    <option value="atRisk">Most at risk first</option>
+                    <option value="enrolled">Biggest first</option>
+                    <option value="name">A to Z</option>
+                  </select>
+                  <button onClick={exportClasses} className="flex items-center gap-1 text-xs text-navy/60 hover:text-gold"><Download size={14} /> CSV</button>
+                </div>
+                {classes.length === 0 ? (
+                  <p className="text-sm text-navy/50">No classes in this view.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-sm">
+                      <thead>
+                        <tr className="border-b border-navy/10 text-left text-[11px] uppercase tracking-widest text-navy/45">
+                          <th className="py-2 pr-3">Class</th>
+                          <th className="py-2 pr-3">Enrolled</th>
+                          <th className="py-2 pr-3">Days held</th>
+                          <th className="w-48 py-2 pr-3">Attendance</th>
+                          <th className="py-2">At risk</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {classes.map((c, i) => (
+                          <tr key={c.id} className="border-b border-navy/5 last:border-0 hover:bg-parchment/60">
+                            <td className="py-2.5 pr-3">
+                              <Link href={`/dashboard/class/${c.id}`} className="font-medium text-navy hover:text-gold">{c.name}</Link>
+                              <span className="block text-xs text-navy/45">
+                                {c.teacher ?? "No teacher"} · {c.creditType === "CORE" ? "Core" : "Elective"}{c.archived && " · archived"}
+                              </span>
+                            </td>
+                            <td className="py-2.5 pr-3 text-navy/75">{c.enrolled}{c.completed > 0 && <span className="text-xs text-sage"> ({c.completed} done)</span>}</td>
+                            <td className="py-2.5 pr-3 text-navy/75">{c.heldDays}</td>
+                            <td className="py-2.5 pr-3">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1"><Meter percent={c.rate ?? 0} color={rateColor(c.rate)} delay={i * 0.03} /></div>
+                                <span className="w-10 text-right text-xs font-semibold text-navy/70">{rateText(c.rate)}</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5">
+                              {c.atRisk > 0 ? <span className="rounded-full bg-clay/15 px-2 py-0.5 text-xs font-semibold text-clay">{c.atRisk}</span> : <span className="text-xs text-navy/35">0</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </Reveal>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Reveal from="left">
+                <div className={card}>
+                  <div className="mb-4 flex items-center">
+                    <h2 className="font-display text-lg text-navy">Stakes</h2>
+                    <button onClick={exportStakes} className="ml-auto flex items-center gap-1 text-xs text-navy/60 hover:text-gold"><Download size={14} /> CSV</button>
+                  </div>
+                  {data.byStake.length === 0 ? (
+                    <p className="text-sm text-navy/50">No students yet.</p>
+                  ) : (
+                    <ul className="space-y-4">
+                      {data.byStake.map((s, i) => (
+                        <li key={s.stake}>
+                          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                            <span className="font-medium text-navy">{s.stake}</span>
+                            <span className="text-xs text-navy/55">
+                              {s.students} students · {rateText(s.rate)}
+                              {s.atRisk > 0 && <b className="ml-1 text-clay">· {s.atRisk} at risk</b>}
+                              {s.graduated > 0 && <span className="ml-1 text-sage">· {s.graduated} graduated</span>}
+                            </span>
+                          </div>
+                          <Meter percent={s.rate ?? 0} color={rateColor(s.rate)} delay={i * 0.05} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </Reveal>
+
+              <Reveal from="right" delay={0.05}>
+                <div className={card}>
+                  <h2 className="mb-4 font-display text-lg text-navy">Semesters side by side</h2>
+                  {data.bySemester.length === 0 ? (
+                    <p className="text-sm text-navy/50">No semesters yet.</p>
+                  ) : (
+                    <ul className="space-y-4">
+                      {data.bySemester.map((s, i) => (
+                        <li key={s.id}>
+                          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                            <span className="font-medium text-navy">
+                              {s.name}
+                              {s.status === "ACTIVE" && <span className="ml-2 rounded-full bg-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-sage">Active</span>}
+                            </span>
+                            <span className="text-xs text-navy/55">{s.classes} classes · {s.enrolled} enrollments · {rateText(s.rate)}</span>
+                          </div>
+                          <Meter percent={s.rate ?? 0} color={rateColor(s.rate)} delay={i * 0.05} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </Reveal>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

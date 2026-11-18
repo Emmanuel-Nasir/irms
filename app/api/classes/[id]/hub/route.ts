@@ -4,6 +4,7 @@ import { ALL_ROLES, requireRole } from "@/lib/permissions";
 import { classAccess } from "@/lib/classAccess";
 import { addDays, daysBetween, todayKey, startOfToday } from "@/lib/dates";
 import { attendanceRate } from "@/lib/stats";
+import { courseProgress } from "@/lib/coursePeriod";
 
 // Everything the class page needs at the top: details, what you may do, and quick numbers
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const cls = await prisma.class.findUnique({
     where: { id },
-    include: { semester: { select: { name: true } }, teacher: { include: { user: { select: { name: true } } } } },
+    include: { semester: true, teacher: { include: { user: { select: { name: true } } } } },
   });
   if (!cls) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
@@ -68,7 +69,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  const course = (await courseProgress([cls], access.studentId ?? undefined))[cls.id];
+
   return NextResponse.json({
+    course,
     roster,
     id: cls.id,
     name: cls.name,

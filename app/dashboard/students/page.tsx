@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ChevronRight, Search } from "lucide-react";
 
 type StudentItem = { id: string; ward: string | null; stake: string | null; phone: string | null; user: { name: string; email: string } };
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [stakeFilter, setStakeFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [name, setName] = useState(""); const [email, setEmail] = useState("");
   const [password, setPassword] = useState(""); const [ward, setWard] = useState("");
   const [stake, setStake] = useState(""); const [phone, setPhone] = useState("");
@@ -14,7 +17,7 @@ export default function StudentsPage() {
 
   async function loadStudents() {
     const res = await fetch("/api/students");
-    setStudents(await res.json());
+    if (res.ok) setStudents(await res.json());
   }
 
   useEffect(() => { loadStudents(); }, []);
@@ -38,7 +41,12 @@ export default function StudentsPage() {
   }
 
   const uniqueStakes = Array.from(new Set(students.map((s) => s.stake).filter(Boolean))) as string[];
-  const filteredStudents = stakeFilter ? students.filter((s) => s.stake === stakeFilter) : students;
+  const q = search.trim().toLowerCase();
+  const filteredStudents = students.filter(
+    (s) =>
+      (!stakeFilter || s.stake === stakeFilter) &&
+      (!q || `${s.user.name} ${s.user.email} ${s.ward ?? ""} ${s.phone ?? ""}`.toLowerCase().includes(q))
+  );
 
   return (
     <div className="min-h-screen bg-parchment">
@@ -67,23 +75,36 @@ export default function StudentsPage() {
           </button>
         </form>
 
-        {uniqueStakes.length > 0 && (
-          <select value={stakeFilter} onChange={(e) => setStakeFilter(e.target.value)}
-            className="mb-4 rounded border border-navy/20 px-3 py-2 text-sm outline-none focus:border-gold">
-            <option value="">All Stakes</option>
-            {uniqueStakes.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        )}
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-navy/35" />
+            <input placeholder="Search name, email, ward or phone" value={search} onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded border border-navy/20 py-2 pl-9 pr-3 text-sm outline-none focus:border-gold" />
+          </div>
+          {uniqueStakes.length > 0 && (
+            <select value={stakeFilter} onChange={(e) => setStakeFilter(e.target.value)}
+              className="rounded border border-navy/20 px-3 py-2 text-sm outline-none focus:border-gold">
+              <option value="">All Stakes</option>
+              {uniqueStakes.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+        </div>
 
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-navy/50">All Students</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-navy/50">{filteredStudents.length} students · tap one to see their profile</p>
         <div className="space-y-3">
           {filteredStudents.map((s) => (
-            <div key={s.id} className="rounded border border-navy/10 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-gold hover:shadow-md">
-              <p className="font-medium text-navy">{s.user.name}</p>
-              <p className="text-sm text-navy/60">
-                {s.user.email}{s.ward && ` · ${s.ward} Ward`}{s.stake && ` · ${s.stake} Stake`}
-              </p>
-            </div>
+            <Link key={s.id} href={`/dashboard/students/${s.id}`} className="group flex items-center gap-3 rounded-xl border border-navy/10 bg-white p-4 shadow-sm hover:border-gold">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-navy to-navy-light font-display text-parchment">
+                {s.user.name.charAt(0)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium text-navy">{s.user.name}</span>
+                <span className="block truncate text-sm text-navy/60">
+                  {s.user.email}{s.ward && ` · ${s.ward} Ward`}{s.stake && ` · ${s.stake} Stake`}
+                </span>
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-navy/30 transition-transform group-hover:translate-x-1 group-hover:text-gold" />
+            </Link>
           ))}
         </div>
       </main>

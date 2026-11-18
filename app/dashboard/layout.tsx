@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, BookOpen, BookPlus, Calendar, CalendarDays, ChevronsLeft, ChevronsRight, ClipboardList, DatabaseBackup,
+  Activity, BookOpen, BookPlus, Calendar, CalendarDays, CalendarHeart, CalendarPlus, ChevronsLeft, ChevronsRight, ClipboardList, DatabaseBackup,
   Download, FilePlus2, FileText, GraduationCap, KeyRound, LayoutDashboard, Library, LockKeyhole, LogOut, Megaphone,
   Menu, NotebookPen, QrCode, School, Search, Send, Shield, ShieldCheck, Timer, UserCog, UserPlus, Users, X,
   type LucideIcon,
 } from "lucide-react";
 import { IrmsMark, StakeLogo } from "@/app/components/Brand";
 import { AnimatedBackground } from "@/app/components/Motion";
+import Notifications from "@/app/components/Notifications";
 
 // quick: an action shortcut (never shown as the "current page", since it opens a task on another page)
 type NavItem = { href: string; label: string; roles: string[]; icon: LucideIcon; keywords?: string; quick?: boolean };
@@ -40,6 +41,7 @@ const GROUPS: NavGroup[] = [
       { href: "/dashboard/classes?add=1", label: "Create a class", icon: BookPlus, roles: LEADERS, keywords: "new class course", quick: true },
       { href: "/dashboard/enrollments?add=1", label: "Enroll a student", icon: ClipboardList, roles: LEADERS, keywords: "enrol add to class", quick: true },
       { href: "/dashboard/announcements?add=1", label: "Post an announcement", icon: Send, roles: LEADERS, keywords: "message news", quick: true },
+      { href: "/dashboard/events?add=1", label: "Plan an event", icon: CalendarPlus, roles: LEADERS, keywords: "devotional social activity rsvp", quick: true },
       // Super admin
       { href: "/dashboard/users?add=1", label: "Add a user", icon: UserPlus, roles: ["SUPER_ADMIN"], keywords: "new account", quick: true },
       { href: "/dashboard/security?backup=1", label: "Download backup", icon: DatabaseBackup, roles: ["SUPER_ADMIN"], keywords: "export everything", quick: true },
@@ -74,6 +76,7 @@ const GROUPS: NavGroup[] = [
     title: "Communicate & report",
     items: [
       { href: "/dashboard/announcements", label: "Announcements", icon: Megaphone, roles: LEADERS, keywords: "news post message" },
+      { href: "/dashboard/events", label: "Events", icon: CalendarHeart, roles: EVERYONE, keywords: "devotional social activity rsvp" },
       { href: "/dashboard/reports", label: "Reports", icon: FileText, roles: LEADERS, keywords: "stakes statistics" },
       { href: "/dashboard/export", label: "Export Data", icon: Download, roles: LEADERS, keywords: "csv download spreadsheet attendance sheet" },
     ],
@@ -293,9 +296,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <StakeLogo size={28} />
           <span className="font-display text-lg tracking-wide text-parchment">IRMS</span>
         </span>
-        <span className="relative w-6">
-          {Object.keys(badges).length > 0 && <span className="irms-ping absolute right-0 top-0 h-2.5 w-2.5 rounded-full bg-gold" />}
-        </span>
+        {/* the notification bell sits here (fixed position, see below) */}
+        <span className="w-10" />
         <div className="irms-shimmer-bar absolute inset-x-0 bottom-0 h-0.5" />
       </div>
 
@@ -471,6 +473,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </div>
       </div>
+
+      {user && !user.mustChangePassword && <Notifications />}
 
       {/* Idle warning */}
       {idleLeft !== null && (

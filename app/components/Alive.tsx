@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 /** Slides its content in when it scrolls into view. */
 export function Reveal({
@@ -133,6 +133,52 @@ export function Ticker({ items }: { items: string[] }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** A burst of gold, green and navy confetti. Change `fire` (e.g. a counter) to burst again. */
+export function Confetti({ fire }: { fire: number }) {
+  const [pieces, setPieces] = useState<{ id: number; left: number; size: number; color: string; dur: number; delay: number; drift: number; turn: number; round: boolean }[]>([]);
+  useEffect(() => {
+    if (!fire || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const colors = ["#C9A227", "#F3DC8A", "#5B8266", "#003057", "#B4544A", "#FAF9F6"];
+    const batch = Array.from({ length: 90 }, (_, i) => ({
+      id: fire * 1000 + i,
+      left: Math.random() * 100,
+      size: 6 + Math.random() * 8,
+      color: colors[i % colors.length],
+      dur: 2.4 + Math.random() * 2,
+      delay: Math.random() * 0.6,
+      drift: (Math.random() - 0.5) * 240,
+      turn: 360 + Math.random() * 900,
+      round: Math.random() < 0.3,
+    }));
+    setPieces(batch);
+    const t = setTimeout(() => setPieces([]), 5200);
+    return () => clearTimeout(t);
+  }, [fire]);
+  return (
+    <>
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          aria-hidden="true"
+          className={`irms-confetti-piece ${p.round ? "rounded-full" : "rounded-sm"}`}
+          style={
+            {
+              left: `${p.left}vw`,
+              width: p.size,
+              height: p.round ? p.size : p.size * 0.45,
+              background: p.color,
+              animationDuration: `${p.dur}s`,
+              animationDelay: `${p.delay}s`,
+              "--irms-drift": `${p.drift}px`,
+              "--irms-turn": `${p.turn}deg`,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </>
   );
 }
 
